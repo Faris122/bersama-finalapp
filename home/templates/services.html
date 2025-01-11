@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<h2>Service List</h2>
+<a href="{% url 'service_map' %}">View Map</a>
+
+<!-- Button to Fetch and Sort by Location -->
+<button id="get-location-btn" class="btn btn-primary">
+    Sort by Distance
+</button>
+
+<!-- Table to Display Services -->
+<table border="1" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Address</th>
+            <th>Categories</th>
+            <th>Distance (km)</th>
+        </tr>
+    </thead>
+    <tbody id="service-table-body">
+        {% for service in services %}
+        <tr>
+            <td>
+                <a href="{% url 'service_detail' service.pk %}">{{ service.title }}</a>
+            </td>
+            <td>{{ service.address }}</td>
+            <td>
+                {% for category in service.categories.all %}
+                    {{ category.name }}{% if not forloop.last %}, {% endif %}
+                {% empty %}
+                    None
+                {% endfor %}
+            </td>
+            <td>
+                {% if service.distance %}
+                    {{ service.distance|floatformat:2 }} km
+                {% else %}
+                    Unknown
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="4" style="text-align: center;">No services available.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- JavaScript to Get User Location -->
+<script>
+    document.getElementById('get-location-btn').addEventListener('click', function() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+
+                // Add latitude and longitude as query parameters
+                const url = new URL(window.location.href);
+                url.searchParams.set('latitude', latitude);
+                url.searchParams.set('longitude', longitude);
+
+                // Reload the page with new parameters
+                window.location.href = url.toString();
+            }, function(error) {
+                alert("Unable to get your location. Services cannot be sorted by distance.");
+                console.error(error);
+            });
+        } else {
+            alert("Geolocation is not supported by your browser.");
+        }
+    });
+</script>
+{% endblock %}

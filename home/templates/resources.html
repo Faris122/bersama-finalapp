@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Resources</h1>
+<a href="{%url 'create_resource' %}">Create Resource</a>
+{% for resource in resources %}
+<p><strong>Categories:</strong>
+    {% for category in resource.categories.all %}
+        <span>{{ category.name }}{% if not forloop.last %}, {% endif %}</span>
+    {% endfor %}
+</p>
+<h3><a href="{% url 'resource_detail' resource.pk %}">{{ resource.title }}</a></h3>
+<small>By <a href="{% url 'profile' resource.author.username %}">@{{ resource.author.username }}</a> on {{ resource.created_at }}</small>
+
+<hr>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% if is_own %}
+    <h2>My Profile</h2>
+{% else %}
+    <h2>{{profile.user.username}}'s Profile</h2>
+{% endif %}
+
+<div>
+    {% if profile.profile_picture %}
+        <img src="{{ profile.profile_picture.url }}" alt="Profile Picture" width="150" height="150">
+    {% endif %}
+    <p><strong>Username:</strong> {{ profile.user.username }}</p>
+    <p><strong>Role:</strong> {{ profile.role }}</p>
+    <p><strong>Bio:</strong> {{ profile.bio }}</p>
+    {% if profile.is_phone_public or is_own %}
+        <p><strong>Phone Number:</strong> {{ profile.phone_number }}</p>
+    {% endif %}
+    {% if profile.role == 'Organisation' %}
+        <p><strong>Organisation Website:</strong> {{ profile.website }}</p>
+    {% endif %}
+    <p><strong>Direct Messages Open:</strong> {{ profile.is_dm_open }}</p>
+</div>
+
+{% if is_own %}
+    <a href="{% url 'edit_profile' %}" class="btn btn-primary">Edit Profile</a>
+{% endif %}
+{% endblock %}

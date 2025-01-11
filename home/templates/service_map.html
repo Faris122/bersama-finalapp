@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<h2>Service Locations</h2>
+
+<!-- Leaflet Map Container -->
+<div id="map" style="height: 600px; width: 100%;"></div>
+
+<!-- Include Leaflet CSS and JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+<script>
+    // Initialize the map
+    var map = L.map('map').setView([0, 0], 2); // Center map to coordinates [0, 0] and zoom level 2
+
+    // Add OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Add markers for services
+    var services = [
+        {% for service in services %}
+            {
+                title: "{{ service.title|escapejs }}",
+                content: "{{ service.content|escapejs }}",
+                address: "{{ service.address|escapejs }}",
+                latitude: {{ service.latitude }},
+                longitude: {{ service.longitude }},
+            },
+        {% endfor %}
+    ];
+
+    // Loop through services and add markers to the map
+    services.forEach(function(service) {
+        console.log(service.title)
+        if (service.latitude && service.longitude) {
+            var marker = L.marker([service.latitude, service.longitude]).addTo(map);
+            marker.bindPopup(
+                "<strong>" + service.title + "</strong><br>" + service.content);
+        }
+    });
+</script>
+{% endblock %}
