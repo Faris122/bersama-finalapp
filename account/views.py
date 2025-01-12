@@ -9,6 +9,12 @@ from .models import *
 from account.models import *
 from django.contrib.auth.decorators import login_required
 
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import *
+
 # Create your views here.
 def login_user(request):
     if request.method == 'POST':
@@ -20,6 +26,7 @@ def login_user(request):
     else:
         form = AuthenticationForm()
     return render(request, 'login.html', {'form': form})
+
 
 def register_user(request):
     if request.method == 'POST':
@@ -60,3 +67,22 @@ def edit_profile(request):
     else:
         form = ProfileEditForm(instance=profile)
     return render(request, 'edit_profile.html', {'form': form})
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_user_api(request):
+    if request.method == 'POST':
+        serializer = RegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "User registered successfully"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['POST'])
+def login_user_api(request):
+    serializer = LoginSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        login(request, user)
+        return Response({"message": "Login successful", "username": user.username}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
