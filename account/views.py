@@ -10,7 +10,7 @@ from account.models import *
 from django.contrib.auth.decorators import login_required
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import *
@@ -85,4 +85,39 @@ def login_user_api(request):
         user = serializer.validated_data['user']
         login(request, user)
         return Response({"message": "Login successful", "username": user.username}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+def logout_user_api(request):
+    if request.user.is_authenticated:
+        logout(request)
+        return Response({"message": "Logout successful"}, status=status.HTTP_200_OK)
+    else:
+        return Response({"error": "User is not logged in"}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_profile_api(request):
+    """API to view the logged-in user's profile."""
+    profile = request.user.profile
+    serializer = ProfileSerializer(profile)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def view_profile_api(request, username):
+    """API to view another user's profile by username."""
+    user = get_object_or_404(User, username=username)
+    profile = get_object_or_404(Profile, user=user)
+    serializer = ProfileSerializer(profile)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def edit_profile_api(request):
+    """API to edit the logged-in user's profile."""
+    profile = request.user.profile
+    serializer = ProfileEditSerializer(profile, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

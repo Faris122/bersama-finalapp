@@ -41,3 +41,33 @@ class LoginSerializer(serializers.Serializer):
 
         data['user'] = user
         return data
+    
+class ProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = Profile
+        fields = [
+            'username', 'phone_number', 'is_phone_public', 'role', 
+            'bio', 'profile_picture', 'website', 'is_dm_open', 'is_verified'
+        ]
+
+    def to_representation(self, instance):
+        """Customize the representation of the serialized data."""
+        representation = super().to_representation(instance)
+
+        # Get the current user from the serializer context
+        request = self.context.get('request')
+        user = request.user if request else None
+
+        # Check if the phone number should be hidden
+        if not instance.is_phone_public and user != instance.user:
+            representation.pop('phone_number', None)  # Remove the phone number for non-owners
+
+        return representation
+    
+class ProfileEditSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = ['phone_number', 'is_phone_public', 'role', 'bio', 
+                  'profile_picture', 'website', 'is_dm_open']
