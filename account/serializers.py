@@ -5,21 +5,43 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 
 class RegistrationSerializer(serializers.ModelSerializer):
+    # Adding all profile-related fields
     phone_number = serializers.CharField(required=False, max_length=10)
     role = serializers.ChoiceField(choices=Profile.ROLE_CHOICES, default='Public')
+    bio = serializers.CharField(required=False, allow_blank=True)
+    profile_picture = serializers.ImageField(required=False)
+    website = serializers.CharField(required=False, allow_blank=True)
+    is_dm_open = serializers.BooleanField(required=False, default=True)
+    is_phone_public = serializers.BooleanField(required=False, default=True)
 
     class Meta:
         model = User
-        fields = ['username', 'password', 'email', 'phone_number', 'role']
+        fields = [
+            'username', 'password', 'email', 'phone_number', 'role',
+            'bio', 'profile_picture', 'website', 'is_dm_open', 'is_phone_public'
+        ]
         extra_kwargs = {
             'password': {'write_only': True}
         }
 
     def create(self, validated_data):
-        phone_number = validated_data.pop('phone_number', None)
-        role = validated_data.pop('role', 'Public')
+        # Extract profile-specific fields
+        profile_data = {
+            'phone_number': validated_data.pop('phone_number', None),
+            'role': validated_data.pop('role', 'Public'),
+            'bio': validated_data.pop('bio', ''),
+            'profile_picture': validated_data.pop('profile_picture', None),
+            'website': validated_data.pop('website', ''),
+            'is_dm_open': validated_data.pop('is_dm_open', True),
+            'is_phone_public': validated_data.pop('is_phone_public', True)
+        }
+        
+        # Create user
         user = User.objects.create_user(**validated_data)
-        Profile.objects.create(user=user, phone_number=phone_number, role=role)
+        
+        # Create profile
+        Profile.objects.create(user=user, **profile_data)
+        
         return user
     
 class LoginSerializer(serializers.Serializer):

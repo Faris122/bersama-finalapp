@@ -101,7 +101,7 @@ class ProfileAPITests(APITestCase):
         # Use the registration API to create a user and profile
         self.register_url = "/api/register/"
         self.login_url = "/api/login/"
-        self.profile_url = "/api/profile/"
+        self.own_profile_url = "/api/profile/"
         self.edit_profile_url = "/api/edit_profile/"
 
         self.valid_user_data = {
@@ -147,7 +147,7 @@ class ProfileAPITests(APITestCase):
 
     def test_retrieve_own_profile(self):
         """Test retrieving the logged-in user's profile"""
-        response = self.client.get(self.profile_url)
+        response = self.client.get(self.own_profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['phone_number'], self.profile.phone_number)
         self.assertEqual(response.data['role'], self.profile.role)
@@ -174,7 +174,7 @@ class ProfileAPITests(APITestCase):
     def test_retrieve_profile_without_authentication(self):
         """Test retrieving own profile without being logged in"""
         self.client.logout()  # Log out the user
-        response = self.client.get(self.profile_url)
+        response = self.client.get(self.own_profile_url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_edit_profile_without_authentication(self):
@@ -224,3 +224,50 @@ class ProfileAPITests(APITestCase):
         }
         response = self.client.put(self.edit_profile_url, updated_data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_phone_number_visible_to_profile_owner(self):
+        """Ensure the phone number is visible to the profile owner."""
+        response = self.client.get(self.own_profile_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('phone_number', response.data)
+        self.assertEqual(response.data['phone_number'], self.profile.phone_number)
+
+    def test_phone_number_hidden_if_not_public(self):
+        """Ensure the phone number is hidden for non-owners when is_phone_public is False."""
+        self.other_profile.is_phone_public = False
+        self.other_profile.save()
+
+        response = self.client.get(self.view_profile_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn('phone_number', response.data)
+
+    def test_phone_number_visible_if_public(self):
+        """Ensure the phone number is visible for non-owners when is_phone_public is True."""
+        self.other_profile.is_phone_public = True
+        self.other_profile.save()
+
+        response = self.client.get(self.view_profile_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('phone_number', response.data)
+        self.assertEqual(response.data['phone_number'], self.other_profile.phone_number)
+
+    def test_phone_number_hidden_for_logged_out_users_if_not_public(self):
+        """Ensure the phone number is hidden for logged-out users when is_phone_public is False."""
+        self.client.logout()
+        self.other_profile.is_phone_public = False
+        self.other_profile.save()
+
+        response = self.client.get(self.view_profile_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn('phone_number', response.data)
+
+    def test_phone_number_visible_for_logged_out_users_if_public(self):
+        """Ensure the phone number is visible for logged-out users when is_phone_public is True."""
+        self.client.logout()
+        self.other_profile.is_phone_public = True
+        self.other_profile.save()
+
+        response = self.client.get(self.view_profile_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('phone_number', response.data)
+        self.assertEqual(response.data['phone_number'], self.other_profile.phone_number)

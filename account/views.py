@@ -25,7 +25,7 @@ def login_user(request):
             return redirect('home')
     else:
         form = AuthenticationForm()
-    return render(request, 'login.html', {'form': form})
+    return render(request, 'login.html')
 
 
 def register_user(request):
@@ -37,7 +37,7 @@ def register_user(request):
             return redirect('home')
     else:
         form = ExtendedUserCreationForm()
-    return render(request, 'registration.html', {'form': form})
+    return render(request, 'registration.html')
 
 def logout_user(request):
     logout(request)
