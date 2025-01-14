@@ -101,7 +101,7 @@ class ProfileAPITests(APITestCase):
         # Use the registration API to create a user and profile
         self.register_url = "/api/register/"
         self.login_url = "/api/login/"
-        self.own_profile_url = "/api/profile/"
+        self.profile_url = "/api/profile/"
         self.edit_profile_url = "/api/edit_profile/"
 
         self.valid_user_data = {
@@ -136,7 +136,7 @@ class ProfileAPITests(APITestCase):
 
         self.other_user = User.objects.get(username="otheruser")
         self.other_profile = self.other_user.profile
-        self.view_profile_url = "/api/profile/otheruser/"
+        self.other_profile_url = "/api/profile/otheruser/"
 
     def test_profile_creation_on_user_registration(self):
         """Ensure a Profile is created when a User is registered via the API"""
@@ -147,9 +147,10 @@ class ProfileAPITests(APITestCase):
 
     def test_retrieve_own_profile(self):
         """Test retrieving the logged-in user's profile"""
-        response = self.client.get(self.own_profile_url)
+        self.client.force_login(self.user)
+        response = self.client.get(self.profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['phone_number'], self.profile.phone_number)
+        self.assertEqual(response.data['username'], self.user.username)
         self.assertEqual(response.data['role'], self.profile.role)
 
     def test_edit_own_profile(self):
@@ -172,13 +173,13 @@ class ProfileAPITests(APITestCase):
         self.assertEqual(self.profile.bio, "Updated bio")
         self.assertFalse(self.profile.is_dm_open)
     def test_retrieve_profile_without_authentication(self):
-        """Test retrieving own profile without being logged in"""
+        """Test retrieving own (no username in url) profile without being logged in"""
         self.client.logout()  # Log out the user
-        response = self.client.get(self.own_profile_url)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        response = self.client.get(self.profile_url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_edit_profile_without_authentication(self):
-        """Test editing own profile without being logged in"""
+        """Test editing user profile without being logged in"""
         self.client.logout()  # Log out the user
         updated_data = {
             "phone_number": "9876543210"
@@ -197,7 +198,7 @@ class ProfileAPITests(APITestCase):
 
     def test_view_other_user_profile(self):
         """Ensure that anyone can view another user's profile"""
-        response = self.client.get(self.view_profile_url.format(username=self.other_user.username))
+        response = self.client.get(self.other_profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Validate the profile data for the other user
@@ -207,7 +208,7 @@ class ProfileAPITests(APITestCase):
     def test_view_other_user_profile_not_logged_in(self):
         """Ensure that logged-out users can view other profiles"""
         self.client.logout()
-        response = self.client.get(self.view_profile_url.format(username=self.other_user.username))
+        response = self.client.get(self.other_profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Validate profile data
@@ -227,7 +228,7 @@ class ProfileAPITests(APITestCase):
 
     def test_phone_number_visible_to_profile_owner(self):
         """Ensure the phone number is visible to the profile owner."""
-        response = self.client.get(self.own_profile_url)
+        response = self.client.get(self.profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('phone_number', response.data)
         self.assertEqual(response.data['phone_number'], self.profile.phone_number)
@@ -237,7 +238,12 @@ class ProfileAPITests(APITestCase):
         self.other_profile.is_phone_public = False
         self.other_profile.save()
 
-        response = self.client.get(self.view_profile_url)
+        response = self.client.get(self.other_profile_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn('phone_number', response.data)
+        self.client.logout()
+
+        response = self.client.get(self.other_profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertNotIn('phone_number', response.data)
 
@@ -246,28 +252,16 @@ class ProfileAPITests(APITestCase):
         self.other_profile.is_phone_public = True
         self.other_profile.save()
 
-        response = self.client.get(self.view_profile_url)
+        response = self.client.get(self.other_profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('phone_number', response.data)
         self.assertEqual(response.data['phone_number'], self.other_profile.phone_number)
 
-    def test_phone_number_hidden_for_logged_out_users_if_not_public(self):
-        """Ensure the phone number is hidden for logged-out users when is_phone_public is False."""
         self.client.logout()
-        self.other_profile.is_phone_public = False
-        self.other_profile.save()
 
-        response = self.client.get(self.view_profile_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertNotIn('phone_number', response.data)
-
-    def test_phone_number_visible_for_logged_out_users_if_public(self):
-        """Ensure the phone number is visible for logged-out users when is_phone_public is True."""
-        self.client.logout()
-        self.other_profile.is_phone_public = True
-        self.other_profile.save()
-
-        response = self.client.get(self.view_profile_url)
+        response = self.client.get(self.other_profile_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('phone_number', response.data)
         self.assertEqual(response.data['phone_number'], self.other_profile.phone_number)
+        
+        

@@ -1,29 +1,70 @@
 {% extends 'base.html' %}
 
 {% block content %}
-{% if is_own %}
-    <h2>My Profile</h2>
-{% else %}
-    <h2>{{profile.user.username}}'s Profile</h2>
-{% endif %}
-
-<div>
-    {% if profile.profile_picture %}
-        <img src="{{ profile.profile_picture.url }}" alt="Profile Picture" width="150" height="150">
+<div id="profile-container">
+    <h2 id="profile-header"></h2>
+    <div>
+        <img id="profile-picture" alt="Profile Picture" width="150" height="150" style="display: none;">
+        <p><strong>Username:</strong> <span id="profile-username"></span></p>
+        <p><strong>Role:</strong> <span id="profile-role"></span></p>
+        <p><strong>Bio:</strong> <span id="profile-bio"></span></p>
+        <p id="profile-phone-number" style="display: none;"><strong>Phone Number:</strong> <span></span></p>
+        <p id="profile-website" style="display: none;"><strong>Organisation Website:</strong> <span></span></p>
+        <p><strong>Direct Messages Open:</strong> <span id="profile-dm-open"></span></p>
+    </div>
+    {% if is_own %}
+        <a href="{% url 'edit_profile' %}" class="btn btn-primary">Edit Profile</a>
     {% endif %}
-    <p><strong>Username:</strong> {{ profile.user.username }}</p>
-    <p><strong>Role:</strong> {{ profile.role }}</p>
-    <p><strong>Bio:</strong> {{ profile.bio }}</p>
-    {% if profile.is_phone_public or is_own %}
-        <p><strong>Phone Number:</strong> {{ profile.phone_number }}</p>
-    {% endif %}
-    {% if profile.role == 'Organisation' %}
-        <p><strong>Organisation Website:</strong> {{ profile.website }}</p>
-    {% endif %}
-    <p><strong>Direct Messages Open:</strong> {{ profile.is_dm_open }}</p>
 </div>
 
-{% if is_own %}
-    <a href="{% url 'edit_profile' %}" class="btn btn-primary">Edit Profile</a>
-{% endif %}
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const profileContainer = document.getElementById("profile-container");
+        const profileHeader = document.getElementById("profile-header");
+        const profileUsername = document.getElementById("profile-username");
+        const profileRole = document.getElementById("profile-role");
+        const profileBio = document.getElementById("profile-bio");
+        const profilePhoneNumber = document.getElementById("profile-phone-number");
+        const profileWebsite = document.getElementById("profile-website");
+        const profileDmOpen = document.getElementById("profile-dm-open");
+        const profilePicture = document.getElementById("profile-picture");
+        const editProfileBtn = document.getElementById("edit-profile-btn");
+
+        // Fetch the profile data
+        const url = "{{api_url}}";
+        fetch(url)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Failed to load profile data.");
+                }
+                return response.json();
+            })
+            .then((data) => {
+                profileHeader.textContent = `${data.username}'s Profile`;
+                profileUsername.textContent = data.username;
+                profileRole.textContent = data.role;
+                profileBio.textContent = data.bio || "No bio available.";
+                profileDmOpen.textContent = data.is_dm_open ? "Yes" : "No";
+
+                if (data.profile_picture) {
+                    profilePicture.src = data.profile_picture;
+                    profilePicture.style.display = "block";
+                }
+
+                if (data.phone_number) {
+                    profilePhoneNumber.querySelector("span").textContent = data.phone_number;
+                    profilePhoneNumber.style.display = "block";
+                }
+
+                if (data.role === "Organisation" && data.website) {
+                    profileWebsite.querySelector("span").textContent = data.website;
+                    profileWebsite.style.display = "block";
+                }
+            })
+            .catch((error) => {
+                profileContainer.textContent = "Error loading profile.";
+                console.error(error);
+            });
+    });
+</script>
 {% endblock %}

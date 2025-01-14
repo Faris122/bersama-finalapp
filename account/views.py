@@ -8,6 +8,7 @@ from django.contrib.auth import login, logout
 from .models import *
 from account.models import *
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -43,17 +44,28 @@ def logout_user(request):
     logout(request)
     return redirect('home')
 
-# View to display the logged-in user's profile
-@login_required
-def my_profile(request):
-    profile = request.user.profile  # Access the profile of the logged-in user
-    return render(request, 'profile.html', {'profile': profile, 'is_own':True})
+def profile(request, username=None):
+    if username is None:
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            raise Http404("Profile not found.")
+        profile = request.user.profile
+        is_own = True
+        api_url = "api/profile"
+    elif username == request.user.username:
+        # If username matches the logged-in user
+        profile = request.user.profile
+        is_own = True
+        api_url = "api/profile"
+    else:
+        # Viewing another user's profile
+        user = get_object_or_404(User, username=username)
+        profile = get_object_or_404(Profile, user=user)
+        is_own = False
+        api_url = "api/profile/"+username
 
-# View to display other users' profiles by username
-def profile(request, username):
-    user = get_object_or_404(User, username=username)
-    profile = get_object_or_404(Profile, user=user)
-    return render(request, 'profile.html', {'profile': profile,  'is_own':False})
+    return render(request, 'profile.html', {'profile': profile, 'is_own': is_own,'api_url':api_url})
+
 
 # View to edit the logged-in user's profile
 @login_required
@@ -96,19 +108,29 @@ def logout_user_api(request):
         return Response({"error": "User is not logged in"}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def my_profile_api(request):
-    """API to view the logged-in user's profile."""
-    profile = request.user.profile
-    serializer = ProfileSerializer(profile)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+def profile_api(request, username=None):
+    """
+    API to view a user's profile.
+    - If `username` is not provided, return the logged-in user's profile.
+    - If `username` is provided:
+        - Return the specified user's profile.
+        - If the username matches the logged-in user, it's treated as their profile.
+    """
+    if username is None:
+        # Check if the user is authenticated
+        if request.user.is_authenticated:
+            profile = request.user.profile
+        else:
+            return Response({"error": "No username in query"}, status=status.HTTP_400_BAD_REQUEST)
+    elif username == request.user.username:
+        # If username matches the logged-in user
+        profile = request.user.profile
+    else:
+        # Viewing another user's profile
+        user = get_object_or_404(User, username=username)
+        profile = get_object_or_404(Profile, user=user)
 
-@api_view(['GET'])
-def view_profile_api(request, username):
-    """API to view another user's profile by username."""
-    user = get_object_or_404(User, username=username)
-    profile = get_object_or_404(Profile, user=user)
-    serializer = ProfileSerializer(profile)
+    serializer = ProfileSerializer(profile, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['PUT'])
