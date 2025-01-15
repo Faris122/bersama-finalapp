@@ -2,10 +2,109 @@
 
 {% block content %}
 <h2>Edit Profile</h2>
-<form method="POST" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-success">Save Changes</button>
-</form>
-<a href="{% url 'my_profile' %}" class="btn btn-secondary">Cancel</a>
+<div id="edit-profile-form">
+    <div class="mb-3">
+        <label for="phone-number" class="form-label">Phone Number</label>
+        <input type="text" class="form-control" id="phone-number">
+    </div>
+    <div class="mb-3">
+        <label for="is-phone-public" class="form-label">Is Phone Number Public</label>
+        <select class="form-select" id="is-phone-public">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="role" class="form-label">Role</label>
+        <select class="form-select" id="role">
+            <option value="Public">Public</option>
+            <option value="Low-Income User">Low-Income User</option>
+            <option value="Organisation">Organisation</option>
+        </select>
+    </div>
+    <div class="mb-3">
+        <label for="bio" class="form-label">Bio</label>
+        <textarea class="form-control" id="bio" rows="3"></textarea>
+    </div>
+    <div class="mb-3">
+        <label for="profile-picture" class="form-label">Profile Picture</label>
+        <input type="file" class="form-control" id="profile-picture">
+    </div>
+    <div class="mb-3">
+        <label for="website" class="form-label">Website</label>
+        <input type="text" class="form-control" id="website">
+    </div>
+    <div class="mb-3">
+        <label for="is-dm-open" class="form-label">Direct Messages Open</label>
+        <select class="form-select" id="is-dm-open">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+        </select>
+    </div>
+    <button id="save-changes" class="btn btn-success">Save Changes</button>
+    <a href="{% url 'profile' %}" class="btn btn-secondary">Cancel</a>
+</div>
+
+<script>
+// Fetch the current profile data and populate the form fields
+function fetchProfile() {
+    fetch('/api/profile/', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('phone-number').value = data.phone_number || '';
+        document.getElementById('is-phone-public').value = data.is_phone_public.toString();
+        document.getElementById('role').value = data.role;
+        document.getElementById('bio').value = data.bio || '';
+        document.getElementById('website').value = data.website || '';
+        document.getElementById('is-dm-open').value = data.is_dm_open.toString();
+    })
+    .catch(error => console.error('Error fetching profile:', error));
+}
+
+// Handle form submission
+document.getElementById('save-changes').addEventListener('click', function() {
+    console.log('Test')
+    const formData = new FormData();
+    formData.append('phone_number', document.getElementById('phone-number').value);
+    formData.append('is_phone_public', document.getElementById('is-phone-public').value);
+    formData.append('role', document.getElementById('role').value);
+    formData.append('bio', document.getElementById('bio').value);
+    formData.append('website', document.getElementById('website').value);
+    formData.append('is_dm_open', document.getElementById('is-dm-open').value);
+
+    // Include the profile picture if a file is selected
+    const profilePicture = document.getElementById('profile-picture').files[0];
+    if (profilePicture) {
+        formData.append('profile_picture', profilePicture);
+    }
+    console.log(formData);
+    fetch('/api/edit_profile/', {
+        method: 'PUT',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Failed to update profile');
+        }
+        return response.json();
+    })
+    .then(data => {
+        alert('Profile updated successfully!');
+        window.location.href = "{% url 'profile' %}";  // Redirect to profile page
+    })
+    .catch(error => alert('Error updating profile: ' + error.message));
+});
+// Load profile data on page load
+document.addEventListener('DOMContentLoaded', fetchProfile);
+</script>
+
 {% endblock %}

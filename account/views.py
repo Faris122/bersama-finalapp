@@ -51,18 +51,18 @@ def profile(request, username=None):
             raise Http404("Profile not found.")
         profile = request.user.profile
         is_own = True
-        api_url = "api/profile"
+        api_url = "/api/profile"
     elif username == request.user.username:
         # If username matches the logged-in user
         profile = request.user.profile
         is_own = True
-        api_url = "api/profile"
+        api_url = "/api/profile"
     else:
         # Viewing another user's profile
         user = get_object_or_404(User, username=username)
         profile = get_object_or_404(Profile, user=user)
         is_own = False
-        api_url = "api/profile/"+username
+        api_url = "/api/profile/"+username
 
     return render(request, 'profile.html', {'profile': profile, 'is_own': is_own,'api_url':api_url})
 

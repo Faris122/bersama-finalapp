@@ -18,7 +18,7 @@
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
         const profileContainer = document.getElementById("profile-container");
         const profileHeader = document.getElementById("profile-header");
         const profileUsername = document.getElementById("profile-username");
@@ -31,40 +31,46 @@
         const editProfileBtn = document.getElementById("edit-profile-btn");
 
         // Fetch the profile data
-        const url = "{{api_url}}";
-        fetch(url)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Failed to load profile data.");
-                }
-                return response.json();
-            })
-            .then((data) => {
-                profileHeader.textContent = `${data.username}'s Profile`;
-                profileUsername.textContent = data.username;
-                profileRole.textContent = data.role;
-                profileBio.textContent = data.bio || "No bio available.";
-                profileDmOpen.textContent = data.is_dm_open ? "Yes" : "No";
+        fetch('{{api_url}}', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error("Failed to load profile data.");
+            }
+            return response.json();
+        })
+        .then((data) => {
+            console.log(data)
+            profileHeader.textContent = `${data.username}'s Profile`;
+            profileUsername.textContent = data.username;
+            profileRole.textContent = data.role;
+            profileBio.textContent = data.bio || "No bio available.";
+            profileDmOpen.textContent = data.is_dm_open ? "Yes" : "No";
 
-                if (data.profile_picture) {
-                    profilePicture.src = data.profile_picture;
-                    profilePicture.style.display = "block";
-                }
+            if (data.profile_picture) {
+                profilePicture.src = data.profile_picture;
+                profilePicture.style.display = "block";
+            }
 
-                if (data.phone_number) {
-                    profilePhoneNumber.querySelector("span").textContent = data.phone_number;
-                    profilePhoneNumber.style.display = "block";
-                }
+            if (data.phone_number) {
+                profilePhoneNumber.querySelector("span").textContent = data.phone_number;
+                profilePhoneNumber.style.display = "block";
+            }
 
-                if (data.role === "Organisation" && data.website) {
-                    profileWebsite.querySelector("span").textContent = data.website;
-                    profileWebsite.style.display = "block";
-                }
-            })
-            .catch((error) => {
-                profileContainer.textContent = "Error loading profile.";
-                console.error(error);
-            });
+            if (data.role === "Organisation" && data.website) {
+                profileWebsite.querySelector("span").textContent = data.website;
+                profileWebsite.style.display = "block";
+            }
+        })
+        .catch((error) => {
+            profileContainer.textContent = "Error loading profile.";
+            console.error(error);
+        });
     });
 </script>
 {% endblock %}
