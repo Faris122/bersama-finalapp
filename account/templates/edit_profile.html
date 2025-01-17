@@ -15,14 +15,6 @@
         </select>
     </div>
     <div class="mb-3">
-        <label for="role" class="form-label">Role</label>
-        <select class="form-select" id="role">
-            <option value="Public">Public</option>
-            <option value="Low-Income User">Low-Income User</option>
-            <option value="Organisation">Organisation</option>
-        </select>
-    </div>
-    <div class="mb-3">
         <label for="bio" class="form-label">Bio</label>
         <textarea class="form-control" id="bio" rows="3"></textarea>
     </div>
@@ -30,7 +22,7 @@
         <label for="profile-picture" class="form-label">Profile Picture</label>
         <input type="file" class="form-control" id="profile-picture">
     </div>
-    <div class="mb-3">
+    <div id="website-div" class="mb-3">
         <label for="website" class="form-label">Website</label>
         <input type="text" class="form-control" id="website">
     </div>
@@ -59,10 +51,19 @@ function fetchProfile() {
     .then(data => {
         document.getElementById('phone-number').value = data.phone_number || '';
         document.getElementById('is-phone-public').value = data.is_phone_public.toString();
-        document.getElementById('role').value = data.role;
         document.getElementById('bio').value = data.bio || '';
-        document.getElementById('website').value = data.website || '';
         document.getElementById('is-dm-open').value = data.is_dm_open.toString();
+        // Handle website visibility and value based on role
+        const websiteDiv = document.getElementById('website-div');
+        const websiteInput = document.getElementById('website');
+
+        if (data.role !== 'Organisation') {
+            websiteDiv.style.display = 'none'; // Hide the website field
+            websiteInput.value = ''; // Set value to none
+        } else {
+            websiteDiv.style.display = 'block'; // Show the website field if role is 'Organisation'
+            websiteInput.value = data.website || ''; // Populate with the website value
+        }
     })
     .catch(error => console.error('Error fetching profile:', error));
 }
@@ -73,7 +74,6 @@ document.getElementById('save-changes').addEventListener('click', function() {
     const formData = new FormData();
     formData.append('phone_number', document.getElementById('phone-number').value);
     formData.append('is_phone_public', document.getElementById('is-phone-public').value);
-    formData.append('role', document.getElementById('role').value);
     formData.append('bio', document.getElementById('bio').value);
     formData.append('website', document.getElementById('website').value);
     formData.append('is_dm_open', document.getElementById('is-dm-open').value);

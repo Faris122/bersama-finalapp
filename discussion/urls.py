@@ -6,5 +6,9 @@ urlpatterns = [
     path('discussions/', views.discussion_list, name='discussion_list'),
     path('discussions/<int:pk>/', views.discussion_detail, name='discussion_detail'),
     path('discussions/create/', views.create_discussion, name='create_discussion'),
+
+    path('api/discussions/', views.discussion_list_api, name='discussion_list_api'),
+    path('api/discussions/<int:pk>/', views.discussion_detail_api, name='discussion_detail_api'),
+    path('api/discussions/<int:pk>/add_comment/', views.add_comment_api, name='add_comment_api'),
     
 ]

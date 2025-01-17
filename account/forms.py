@@ -25,4 +25,4 @@ class ExtendedUserCreationForm(UserCreationForm):
 class ProfileEditForm(forms.ModelForm):
     class Meta:
         model = Profile
-        fields = ['phone_number', 'is_phone_public', 'role', 'bio', 'profile_picture', 'website', 'is_dm_open']
+        fields = ['phone_number', 'is_phone_public', 'bio', 'profile_picture', 'website', 'is_dm_open']

@@ -1,12 +1,13 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
-from django.contrib import messages
 from .forms import *
 from django.contrib.auth.models import User
-from django.contrib.auth import login, logout
 from .models import *
 from account.models import *
 from django.contrib.auth.decorators import login_required
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.response import Response
+from .serializers import *
 
 # Create your views here.
 def discussion_list(request):
@@ -52,3 +53,43 @@ def create_discussion(request):
     else:
         form = DiscussionForm()
     return render(request, 'create_discussion.html', {'form': form})
+
+@api_view(['GET'])
+def discussion_list_api(request):
+    """API to get a list of discussions."""
+    discussions = Discussion.objects.all()
+    serializer = DiscussionSerializer(discussions, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticatedOrReadOnly])
+def discussion_detail_api(request, pk):
+    try:
+        discussion = Discussion.objects.get(pk=pk)
+    except Discussion.DoesNotExist:
+        return Response({'error': 'Discussion not found'}, status=404)
+
+    serializer = DiscussionDetailSerializer(discussion)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_comment_api(request, pk):
+    try:
+        discussion = Discussion.objects.get(pk=pk)
+    except Discussion.DoesNotExist:
+        return Response({'error': 'Discussion not found'}, status=404)
+
+    parent_id = request.data.get('parent_id')
+    serializer = DiscussionCommentSerializer(data=request.data)
+    if serializer.is_valid():
+        comment = serializer.save(author=request.user, post=discussion)
+        if parent_id:
+            try:
+                parent_comment = DiscussionComment.objects.get(id=parent_id)
+                comment.parent = parent_comment
+                comment.save()
+            except DiscussionComment.DoesNotExist:
+                return Response({'error': 'Parent comment not found'}, status=404)
+        return Response(DiscussionCommentSerializer(comment).data, status=201)
+    return Response(serializer.errors, status=400)

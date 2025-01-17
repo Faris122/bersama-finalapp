@@ -158,7 +158,6 @@ class ProfileAPITests(APITestCase):
         updated_data = {
             "phone_number": "9876543210",
             "is_phone_public": False,
-            "role": "Organisation",
             "bio": "Updated bio",
             "is_dm_open": False
         }
@@ -221,7 +220,6 @@ class ProfileAPITests(APITestCase):
 
         updated_data = {
             "phone_number": "9876543210",
-            "role": "Organisation"
         }
         response = self.client.put(self.edit_profile_url, updated_data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
