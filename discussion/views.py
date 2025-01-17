@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from rest_framework import status
 from .serializers import *
 
 # Create your views here.
@@ -61,13 +62,33 @@ def discussion_list_api(request):
     serializer = DiscussionSerializer(discussions, many=True)
     return Response(serializer.data)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_discussion_api(request):
+    """API to create a new discussion."""
+    serializer = DiscussionCreateSerializer(data=request.data)
+    if serializer.is_valid():
+        discussion = serializer.save(author=request.user)  # Attach the logged-in user as the author
+        return Response({
+            'message': 'Discussion created successfully!',
+            'discussion': {
+                'id': discussion.id,
+                'title': discussion.title,
+                'content': discussion.content,
+                'categories': [category.name for category in discussion.categories.all()],
+                'author_username': discussion.author.username,
+                'created_at': discussion.created_at
+            }
+        }, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticatedOrReadOnly])
 def discussion_detail_api(request, pk):
     try:
         discussion = Discussion.objects.get(pk=pk)
     except Discussion.DoesNotExist:
-        return Response({'error': 'Discussion not found'}, status=404)
+        return Response({'error': 'Discussion not found'}, status=status.HTTP_404_NOT_FOUND)
 
     serializer = DiscussionDetailSerializer(discussion)
     return Response(serializer.data)
@@ -78,7 +99,7 @@ def add_comment_api(request, pk):
     try:
         discussion = Discussion.objects.get(pk=pk)
     except Discussion.DoesNotExist:
-        return Response({'error': 'Discussion not found'}, status=404)
+        return Response({'error': 'Discussion not found'}, status=status.HTTP_404_NOT_FOUND)
 
     parent_id = request.data.get('parent_id')
     serializer = DiscussionCommentSerializer(data=request.data)
@@ -90,6 +111,13 @@ def add_comment_api(request, pk):
                 comment.parent = parent_comment
                 comment.save()
             except DiscussionComment.DoesNotExist:
-                return Response({'error': 'Parent comment not found'}, status=404)
-        return Response(DiscussionCommentSerializer(comment).data, status=201)
-    return Response(serializer.errors, status=400)
+                return Response({'error': 'Parent comment not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(DiscussionCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+def discussion_categories_list_api(request):
+    """API to fetch all discussion categories."""
+    categories = DiscussionCategory.objects.all()
+    serializer = DiscussionCategorySerializer(categories, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)

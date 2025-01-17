@@ -9,6 +9,16 @@ class DiscussionSerializer(serializers.ModelSerializer):
         model = Discussion
         fields = ['id', 'title', 'content', 'author_username', 'categories', 'created_at']
 
+class DiscussionCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DiscussionCategory
+        fields = ['id', 'name']
+
+class DiscussionCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Discussion
+        fields = ['title', 'content', 'categories']  # Exclude 'author' and 'created_at'
+
 class DiscussionCommentSerializer(serializers.ModelSerializer):
     author_username = serializers.CharField(source='author.username', read_only=True)
     replies = serializers.SerializerMethodField()

@@ -3,21 +3,53 @@ from rest_framework import status
 from django.contrib.auth.models import User
 from .models import *
 
-class DiscussionListTestCase(APITestCase):
+class DiscussionListCreateTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', password='password')
         self.category = DiscussionCategory.objects.create(name='General')
+        self.category2 = DiscussionCategory.objects.create(name='Tech')
         self.discussion = Discussion.objects.create(
             title="Test Discussion",
             content="This is a test discussion.",
             author=self.user
         )
         self.discussion.categories.add(self.category)
+        self.client.force_login(self.user)
 
     def test_get_discussion_list(self):
         response = self.client.get('/api/discussions/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+
+    def test_create_discussion(self):
+        """Test creating a new discussion."""
+        url = '/api/discussions/create/'
+        data = {
+            'title': 'New Discussion',
+            'content': 'This is a new discussion.',
+            'categories': [self.category.id, self.category2.id]  # Use category IDs
+        }
+        response = self.client.post(url, data, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['message'], 'Discussion created successfully!')
+
+        discussion = Discussion.objects.get(title='New Discussion')
+        self.assertEqual(discussion.content, 'This is a new discussion.')
+        self.assertEqual(discussion.author.username, 'testuser')
+        self.assertEqual(list(discussion.categories.all()), [self.category, self.category2])
+
+    def test_create_discussion_unauthenticated(self):
+        """Test creating a discussion without authentication."""
+        self.client.logout()
+        url = '/api/discussions/create/'
+        data = {
+            'title': 'Test Discussion',
+            'content': 'This is a test discussion.',
+            'categories': [self.category.id]
+        }
+        response = self.client.post(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 class DiscussionDetailCommentAPITestCase(APITestCase):
     def setUp(self):
@@ -65,7 +97,7 @@ class DiscussionDetailCommentAPITestCase(APITestCase):
             'parent_id': self.comment.id,
         }, format='json')
 
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['content'], 'This is a reply.')
         self.assertEqual(response.data['parent'], self.comment.id)
 
@@ -77,6 +109,17 @@ class DiscussionDetailCommentAPITestCase(APITestCase):
             'parent_id': 999,  # Non-existent comment ID
         }, format='json')
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIn('error', response.data)
         self.assertEqual(response.data['error'], 'Parent comment not found')
+
+class CategoryTestCase(APITestCase):
+    def setUp(self):
+        DiscussionCategory.objects.create(name="General")
+        DiscussionCategory.objects.create(name="Specific")
+
+    def test_list_categories(self):
+        response = self.client.get('/api/discussions/categories/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['name'], "General")

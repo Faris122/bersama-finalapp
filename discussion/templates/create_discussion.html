@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Create a New Discussion</h2>
+<div id="create-discussion-container">
+    <div class="mb-3">
+        <label for="discussion-title" class="form-label">Title</label>
+        <input type="text" class="form-control" id="discussion-title" placeholder="Enter discussion title">
+    </div>
+    <div class="mb-3">
+        <label for="discussion-content" class="form-label">Content</label>
+        <textarea class="form-control" id="discussion-content" rows="5" placeholder="Enter discussion content"></textarea>
+    </div>
+    <div class="mb-3">
+        <label for="discussion-categories" class="form-label">Categories</label>
+        <select multiple class="form-select" id="discussion-categories">
+            <!-- Categories will be dynamically populated -->
+        </select>
+    </div>
+    <button id="submit-discussion" class="btn btn-primary">Submit</button>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const categoriesSelect = document.getElementById("discussion-categories");
+
+        // Fetch categories to populate the dropdown
+        fetch('api/discussions/categories/')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to load categories.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                data.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name;
+                    categoriesSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error loading categories:', error));
+
+        // Handle discussion creation
+        document.getElementById("submit-discussion").addEventListener("click", () => {
+            const title = document.getElementById("discussion-title").value;
+            const content = document.getElementById("discussion-content").value;
+            const categories = Array.from(categoriesSelect.selectedOptions).map(option => option.value);
+
+            if (!title || !content) {
+                alert("Title and content are required!");
+                return;
+            }
+
+            fetch('/api/discussions/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    title: title,
+                    content: content,
+                    categories: categories
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to create discussion.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert("Discussion created successfully!");
+                window.location.href = `/discussions/${data.discussion.id}/`;  // Redirect to discussion detail
+            })
+            .catch(error => {
+                console.error('Error creating discussion:', error);
+                alert("Error creating discussion. Please try again.");
+            });
+        });
+    });
+</script>
+{% endblock %}
