@@ -123,3 +123,56 @@ class CategoryTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
         self.assertEqual(response.data[0]['name'], "General")
+
+from rest_framework.test import APITestCase
+from rest_framework import status
+from .models import Discussion, DiscussionCategory, User
+
+class DiscussionSearchAPITestCase(APITestCase):
+    def setUp(self):
+        user = User.objects.create_user(username="testuser", password="testpass")
+        category1 = DiscussionCategory.objects.create(name="General")
+        category2 = DiscussionCategory.objects.create(name="Specific")
+        category3 = DiscussionCategory.objects.create(name="Help")
+
+        discussion1 = Discussion.objects.create(
+            title="Discussion One",
+            content="Discussion Details",
+            author=user
+        )
+        discussion1.categories.add(category1, category3)
+
+        discussion2 = Discussion.objects.create(
+            title="Discussion Two",
+            content="Discussion Details",
+            author=user
+        )
+        discussion2.categories.add(category2)
+
+    def test_filter_search_title(self):
+        response = self.client.get('/api/discussions/search/?q=One')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['title'], "Discussion One")
+
+    def test_filter_search_contents(self):
+        response = self.client.get('/api/discussions/search/?q=Details')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['content'], "Discussion Details")
+        
+    def test_filter_no_match(self):
+        response = self.client.get('/api/discussions/search/?q=invalid')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)
+
+    def test_filter_categories(self):
+        response = self.client.get('/api/discussions/search/?categories=General,Help')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)  # Only the Python Tips discussion should be returned
+        self.assertEqual(response.data[0]['title'], "Discussion One")
+
+    def test_filter_categories_no_match(self):
+        response = self.client.get('/api/discussions/search/?categories=Specific,Help')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 0)

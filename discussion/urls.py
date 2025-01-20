@@ -12,5 +12,6 @@ urlpatterns = [
     path('api/discussions/<int:pk>/', views.discussion_detail_api, name='discussion_detail_api'),
     path('api/discussions/<int:pk>/add_comment/', views.add_comment_api, name='add_comment_api'),
     path('api/discussions/categories/', views.discussion_categories_list_api, name='discussion_categories_list_api'),
+    path('api/discussions/search/',views.search_discussions, name='search_discussions')
     
 ]

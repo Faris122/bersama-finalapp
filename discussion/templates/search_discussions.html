@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Search Discussions</h2>
+    
+    <!-- Search Box -->
+    <div class="mb-3">
+        <input type="text" id="search-box" class="form-control" placeholder="Search discussions by title or content...">
+    </div>
+    
+    <!-- Category Filters -->
+    <div class="mb-3">
+        <h5>Filter by Categories</h5>
+        {% for category in categories %}
+        <div class="form-check">
+            <input class="form-check-input category-filter" type="checkbox" value="{{ category.name }}" id="category-{{ category.id }}">
+            <label class="form-check-label" for="category-{{ category.id }}">{{ category.name }}</label>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Results Section -->
+    <h3>Results</h3>
+    <div id="results-container">
+        <!-- Results will be dynamically inserted here -->
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const searchBox = document.getElementById('search-box');
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        const resultsContainer = document.getElementById('results-container');
+
+        // Function to fetch and update results
+        function fetchResults() {
+            // Get the search query
+            const query = searchBox.value;
+
+            // Get selected categories
+            const selectedCategories = Array.from(categoryFilters)
+                .filter(checkbox => checkbox.checked)
+                .map(checkbox => checkbox.value)
+                .join(',');
+
+            // Fetch results from the API
+            fetch(`/api/discussions/search/?q=${encodeURIComponent(query)}&categories=${encodeURIComponent(selectedCategories)}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Clear previous results
+                    resultsContainer.innerHTML = '';
+
+                    if (data.length === 0) {
+                        resultsContainer.innerHTML = '<p>No discussions found.</p>';
+                        return;
+                    }
+
+                    // Populate results
+                    data.forEach(discussion => {
+                        const discussionHTML = `
+                            <div class="discussion-item mb-3">
+                                <h4>${discussion.title}</h4>
+                                <p>${discussion.content}</p>
+                                <p><strong>Categories:</strong> ${discussion.categories.join(', ')}</p>
+                                <p><small>By ${discussion.author_username} on ${new Date(discussion.created_at).toLocaleDateString()}</small></p>
+                                <hr>
+                            </div>
+                        `;
+                        resultsContainer.innerHTML += discussionHTML;
+                    });
+                })
+                .catch(error => {
+                    resultsContainer.innerHTML = '<p>Error loading discussions.</p>';
+                    console.error(error);
+                });
+        }
+
+        // Event Listeners for Search Box and Filters
+        searchBox.addEventListener('input', fetchResults); // Trigger on input change
+        categoryFilters.forEach(checkbox => {
+            checkbox.addEventListener('change', fetchResults); // Trigger on checkbox change
+        });
+
+        // Initial fetch on page load
+        fetchResults();
+    });
+</script>
+{% endblock %}

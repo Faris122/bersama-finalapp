@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Count
 from .forms import *
 from django.contrib.auth.models import User
 from .models import *
@@ -120,4 +121,27 @@ def discussion_categories_list_api(request):
     """API to fetch all discussion categories."""
     categories = DiscussionCategory.objects.all()
     serializer = DiscussionCategorySerializer(categories, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+def search_discussions(request):
+    """Search discussions by title, content, or filter by multiple categories."""
+    query = request.GET.get('q', '')  # Search query
+    categories = request.GET.get('categories', '')  # Comma-separated category names
+
+    discussions = Discussion.objects.all()
+
+    # Filter by search query (title/content)
+    if query:
+        discussions = discussions.filter(title__icontains=query) | discussions.filter(content__icontains=query)
+
+    # Filter by multiple categories
+    if categories:
+        category_list = categories.split(',')
+        discussions = discussions.filter(categories__name__in=category_list) \
+                                 .annotate(category_count=Count('categories')) \
+                                 .filter(category_count=len(category_list))
+
+    # Serialize and return results
+    serializer = DiscussionSerializer(discussions, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
