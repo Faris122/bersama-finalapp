@@ -13,10 +13,10 @@ from service.models import *
 
 def create_users_and_profiles():
     users_data = [
-        {'username': 'user1', 'email': 'user1@mail.com', 'password': 'password123', 'role': 'Public'},
-        {'username': 'user2', 'email': 'user2@mail.com', 'password': 'password123', 'role': 'Low-Income User'},
-        {'username': 'user3', 'email': 'user3@mail.com', 'password': 'password123', 'role': 'Organisation'},
-        {'username': 'jackdaniels', 'email': 'jackdaniels@mail.com', 'password': 'password123', 'role': 'Low-Income User'}
+        {'username': 'user1', 'email': 'user1@mail.com', 'password': 'password123', 'role': 'Public', 'needs_help': True},
+        {'username': 'user2', 'email': 'user2@mail.com', 'password': 'password123', 'role': 'Public', 'needs_help': False},
+        {'username': 'user3', 'email': 'user3@mail.com', 'password': 'password123', 'role': 'Organisation', 'needs_help': False},
+        {'username': 'jackdaniels', 'email': 'jackdaniels@mail.com', 'password': 'password123', 'role': 'Public', 'needs_help': True}
     ]
 
     users = []
@@ -29,14 +29,13 @@ def create_users_and_profiles():
         # Create Profile
         profile, _ = Profile.objects.get_or_create(
             user=user,
-            defaults={
-                'role': data['role'],
-                'bio': f"This is the bio of {user.username}.",
-                'phone_number': '1234567890',
-                'is_phone_public': True,
-                'is_verified': True if data['role'] == 'Organisation' else False,
-            }
+            role=data['role'],
+            bio=f"This is the bio of {data['username']}.",
+            needs_help=data['needs_help']
         )
+        # Create Financial Profile ONLY IF the user needs help
+        if data['needs_help'] == True:
+            FinancialProfile.objects.get_or_create(profile=profile)
         users.append(user)
     return users
 

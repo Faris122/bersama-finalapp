@@ -28,7 +28,7 @@ class AuthAPITests(APITestCase):
             "username": "testuser2",
             "password": "password123",
             "email": "testuser2@example.com",
-            "role": "NonExistentRole"  # Invalid role
+            "role": "NonExistentRole"
         }
 
         self.login_data = {
@@ -129,7 +129,7 @@ class ProfileAPITests(APITestCase):
             "password": "password123",
             "email": "other@example.com",
             "phone_number": "9876543210",
-            "role": "Low-Income User"
+            "role": "Public"
         }
         response = self.client.post(self.register_url, self.other_user_data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

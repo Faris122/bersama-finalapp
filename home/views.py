@@ -7,7 +7,9 @@ from django.contrib.auth import login, logout
 from .models import *
 from django.contrib.auth.decorators import login_required
 
+# View for home
 def home(request):
     return render(request, 'home.html')
+
 
 

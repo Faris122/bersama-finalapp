@@ -33,78 +33,170 @@
             <option value="false">No</option>
         </select>
     </div>
+    <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="needs-help">
+        <label for="needs-help" class="form-check-label">Do you require assistance?</label>
+    </div>
+    
+    <!-- Financial Profile Section (Initially Hidden) -->
+    <div id="financial-profile-section" style="display: none;">
+        <h3>Financial Profile</h3>
+        <p>This can help identify the most suitable aid and resources for you</p>
+        <p>These are optional if you do not feel comfortable. These will be kept confidential to everyone
+            apart from non-profit organisations.
+        </p>
+        <div class="mb-3">
+            <label for="own-income" class="form-label">Your Income</label>
+            <input type="number" class="form-control" id="own-income" placeholder="Enter your income">
+        </div>
+    
+        <div class="mb-3">
+            <label for="household-income" class="form-label">Household Income</label>
+            <input type="number" class="form-control" id="household-income" placeholder="Enter household income">
+        </div>
+    
+        <div class="mb-3">
+            <label for="household-members" class="form-label">Household Members</label>
+            <input type="number" class="form-control" id="household-members" placeholder="Enter number of household members">
+        </div>
+    
+        <div class="mb-3">
+            <label for="employment-status" class="form-label">Employment Status</label>
+            <select id="employment-status" class="form-select">
+                <option value="Working">Working</option>
+                <option value="Student">Student</option>
+                <option value="Unemployed">Unemployed</option>
+                <option value="Retired">Retired</option>
+                <option value="Disabled">Disabled</option>
+            </select>
+        </div>
+    
+        <div class="mb-3">
+            <label for="housing-status" class="form-label">Housing Status</label>
+            <select id="housing-status" class="form-select">
+                <option value="Owned">Owned</option>
+                <option value="Rented">Rented</option>
+                <option value="Homeless">Homeless</option>
+                <option value="Shelter">Shelter</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Does your household include:</label>
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="has_elderly">
+                <label for="has_elderly" class="form-check-label">Elderly members</label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="has_children">
+                <label for="has_children" class="form-check-label">Children</label>
+            </div>
+        </div>
+    </div>    
     <button id="save-changes" class="btn btn-success">Save Changes</button>
     <a href="{% url 'profile' %}" class="btn btn-secondary">Cancel</a>
 </div>
 
 <script>
-// Fetch the current profile data and populate the form fields
-function fetchProfile() {
-    fetch('/api/profile/', {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('phone-number').value = data.phone_number || '';
-        document.getElementById('is-phone-public').value = data.is_phone_public.toString();
-        document.getElementById('bio').value = data.bio || '';
-        document.getElementById('is-dm-open').value = data.is_dm_open.toString();
-        // Handle website visibility and value based on role
-        const websiteDiv = document.getElementById('website-div');
-        const websiteInput = document.getElementById('website');
+    function fetchProfile() {
+        fetch('/api/profile/', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('phone-number').value = data.phone_number || '';
+            document.getElementById('is-phone-public').value = data.is_phone_public.toString();
+            document.getElementById('bio').value = data.bio || '';
+            document.getElementById('is-dm-open').value = data.is_dm_open.toString();
 
-        if (data.role !== 'Organisation') {
-            websiteDiv.style.display = 'none'; // Hide the website field
-            websiteInput.value = ''; // Set value to none
-        } else {
-            websiteDiv.style.display = 'block'; // Show the website field if role is 'Organisation'
-            websiteInput.value = data.website || ''; // Populate with the website value
-        }
-    })
-    .catch(error => console.error('Error fetching profile:', error));
-}
+            // Handle website visibility
+            const websiteDiv = document.getElementById('website-div');
+            const websiteInput = document.getElementById('website');
+            if (data.role !== 'Organisation') {
+                websiteDiv.style.display = 'none';
+                websiteInput.value = '';
+            } else {
+                websiteDiv.style.display = 'block';
+                websiteInput.value = data.website || '';
+            }
 
-// Handle form submission
-document.getElementById('save-changes').addEventListener('click', function() {
-    console.log('Test')
-    const formData = new FormData();
-    formData.append('phone_number', document.getElementById('phone-number').value);
-    formData.append('is_phone_public', document.getElementById('is-phone-public').value);
-    formData.append('bio', document.getElementById('bio').value);
-    formData.append('website', document.getElementById('website').value);
-    formData.append('is_dm_open', document.getElementById('is-dm-open').value);
+            // Handle needs_help checkbox
+            const needsHelpCheckbox = document.getElementById('needs-help');
+            const financialProfileSection = document.getElementById('financial-profile-section');
+            needsHelpCheckbox.checked = data.needs_help || false;
+            financialProfileSection.style.display = needsHelpCheckbox.checked ? 'block' : 'none';
 
-    // Include the profile picture if a file is selected
-    const profilePicture = document.getElementById('profile-picture').files[0];
-    if (profilePicture) {
-        formData.append('profile_picture', profilePicture);
+            // Populate financial profile fields if needs_help is true
+            if (needsHelpCheckbox.checked && data.financial_profile) {
+                document.getElementById('own-income').value = data.financial_profile.own_income || '';
+                document.getElementById('household-income').value = data.financial_profile.household_income || '';
+                document.getElementById('household-members').value = data.financial_profile.household_members || '';
+                document.getElementById('employment-status').value = data.financial_profile.employment_status || 'Unemployed';
+                document.getElementById('housing-status').value = data.financial_profile.housing_status || 'Other';
+            }
+        })
+        .catch(error => console.error('Error fetching profile:', error));
     }
-    console.log(formData);
-    fetch('/api/edit_profile/', {
-        method: 'PUT',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: formData
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Failed to update profile');
+
+    // Show/hide financial profile section when the checkbox is toggled
+    document.getElementById('needs-help').addEventListener('change', function() {
+        document.getElementById('financial-profile-section').style.display = this.checked ? 'block' : 'none';
+    });
+
+    // Handle form submission
+    document.getElementById('save-changes').addEventListener('click', function() {
+        const formData = new FormData();
+        formData.append('phone_number', document.getElementById('phone-number').value);
+        formData.append('is_phone_public', document.getElementById('is-phone-public').value);
+        formData.append('bio', document.getElementById('bio').value);
+        formData.append('website', document.getElementById('website').value);
+        formData.append('is_dm_open', document.getElementById('is-dm-open').value);
+        formData.append('needs_help', document.getElementById('needs-help').checked);
+
+        // Include financial profile data if needs_help is checked
+        if (document.getElementById('needs-help').checked) {
+            formData.append('own_income', document.getElementById('own-income').value);
+            formData.append('household_income', document.getElementById('household-income').value);
+            formData.append('household_members', document.getElementById('household-members').value);
+            formData.append('employment_status', document.getElementById('employment-status').value);
+            formData.append('housing_status', document.getElementById('housing-status').value);
+            formData.append('has_elderly', document.getElementById('has_elderly').checked);
+            formData.append('has_children', document.getElementById('has_children').checked);
         }
-        return response.json();
-    })
-    .then(data => {
-        alert('Profile updated successfully!');
-        window.location.href = "{% url 'profile' %}";  // Redirect to profile page
-    })
-    .catch(error => alert('Error updating profile: ' + error.message));
-});
-// Load profile data on page load
-document.addEventListener('DOMContentLoaded', fetchProfile);
+
+        // Include the profile picture if a file is selected
+        const profilePicture = document.getElementById('profile-picture').files[0];
+        if (profilePicture) {
+            formData.append('profile_picture', profilePicture);
+        }
+
+        fetch('/api/edit_profile/', {
+            method: 'PUT',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to update profile');
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert('Profile updated successfully!');
+            window.location.href = "{% url 'profile' %}";  // Redirect to profile page
+        })
+        .catch(error => alert('Error updating profile: ' + error.message));
+    });
+
+    // Load profile data on page load
+    document.addEventListener('DOMContentLoaded', fetchProfile);
 </script>
+    
 
 {% endblock %}

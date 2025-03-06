@@ -1,89 +1,88 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2 id="discussion-title"></h2>
-<p id="discussion-content"></p>
-<p><strong>Categories:</strong> <span id="discussion-categories"></span></p>
-<p id="discussion-author"></p>
-<hr>
+<div class="container my-4">
+    <!-- Discussion Details Card -->
+    <div class="card mb-4">
+        <div class="card-header">
+        <h2 id="discussion-title" class="card-title"></h2>
+        </div>
+        <div class="card-body">
+        <p id="discussion-content" class="card-text"></p>
+        <p><strong>Categories:</strong> <span id="discussion-categories"></span></p>
+        </div>
+        <div class="card-footer text-muted" id="discussion-author"></div>
+    </div>
 
-<h3>Post a Comment</h3>
-{% if user.is_authenticated %}
-<form id="comment-form">
-    <textarea id="comment-content" class="form-control" rows="3" placeholder="Write a comment..."></textarea>
-    <input type="hidden" id="parent-id" value="">
-    <button type="submit" class="btn btn-primary">Submit</button>
-</form>
-{% else %}
-<p>Log in/Register to post a comment</p>
-{% endif %}
-<hr>
+    <!-- Comment Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Post a Comment</h3>
+        </div>
+        <div class="card-body">
+            {% if user.is_authenticated %}
+            <form id="comment-form">
+                <div class="mb-3">
+                    <textarea id="comment-content" class="form-control" rows="3" placeholder="Write a comment..."></textarea>
+                </div>
+                <input type="hidden" id="parent-id" value="">
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+            {% else %}
+            <p>Log in/Register to post a comment</p>
+            {% endif %}
+        </div>
+    </div>
 
-<h3>Comments</h3>
-<div id="comments-container"></div>
+    <!-- Comments Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Comments</h3>
+        </div>
+        <div class="card-body" id="comments-container">
+            {% for comment in comments %}
+                {% include 'comment.html' with comment=comment %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
 
 <script>
-    const commentsContainer = document.getElementById("comments-container");
 
-    // Fetch discussion details
-    fetch(`/api/discussions/{{ discussion.id }}/`)
+    document.addEventListener("DOMContentLoaded", () => {
+        fetch(`/api/discussions/{{ discussion.id }}/`)
         .then(response => response.json())
         .then(data => {
-            document.getElementById("discussion-title").textContent = data.title;
-            document.getElementById("discussion-content").textContent = data.content;
-            document.getElementById("discussion-categories").textContent = data.categories.join(", ");
-            document.getElementById("discussion-author").textContent = `Created by @${data.author_username} on ${new Date(data.created_at).toLocaleString()}`;
-            renderComments(data.comments);
+        document.getElementById("discussion-title").textContent = data.title;
+        document.getElementById("discussion-content").textContent = data.content;
+        document.getElementById("discussion-categories").textContent = data.categories.join(", ");
+        document.getElementById("discussion-author").textContent = 
+            `Created by @${data.author_username} on ${new Date(data.created_at).toLocaleString()}`;
+        renderComments(data.comments);
         })
-        .catch(error => console.error("Error fetching discussion details:", error));
-
-    // Render comments
-    function renderComments(comments) {
-        commentsContainer.innerHTML = comments.map(comment => `
-            <div class="comment">
-                <p><strong>@${comment.author_username}</strong> - ${new Date(comment.created_at).toLocaleString()}</p>
-                <p>${comment.content}</p>
-                ${comment.replies ? renderReplies(comment.replies) : ""}
-                <button class="btn btn-link reply-btn" data-id="${comment.id}">Reply</button>
-            </div>
-        `).join("");
-        attachReplyListeners();
-    }
-
-    function renderReplies(replies) {
-        return `<div class="replies">${replies.map(reply => `
-            <div class="comment-reply">
-                <p><strong>@${reply.author_username}</strong> - ${new Date(reply.created_at).toLocaleString()}</p>
-                <p>${reply.content}</p>
-            </div>
-        `).join("")}</div>`;
-    }
-
-    // Add reply functionality
-    function attachReplyListeners() {
+    .catch(error => console.error("Error fetching discussion details:", error));
         document.querySelectorAll(".reply-btn").forEach(button => {
             button.addEventListener("click", () => {
                 document.getElementById("parent-id").value = button.dataset.id;
             });
         });
-    }
 
-    // Handle comment form submission
-    document.getElementById("comment-form").addEventListener("submit", event => {
-        event.preventDefault();
-        const content = document.getElementById("comment-content").value;
-        const parentId = document.getElementById("parent-id").value;
+        document.getElementById("comment-form").addEventListener("submit", event => {
+            event.preventDefault();
+            const content = document.getElementById("comment-content").value;
+            const parentId = document.getElementById("parent-id").value;
 
-        fetch(`/api/discussions/{{ discussion.id }}/add_comment/`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": "{{ csrf_token }}"
-            },
-            body: JSON.stringify({ content, parent: parentId })
-        })
-        .then(response => response.json())
-        .then(() => location.reload())
-        .catch(error => console.error("Error posting comment:", error));
+            fetch(`/api/discussions/{{ discussion.id }}/add_comment/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: JSON.stringify({ content, parent: parentId })
+            })
+            .then(response => response.json())
+            .then(() => location.reload())
+            .catch(error => console.error("Error posting comment:", error));
+        });
     });
 </script>
 {% endblock %}
