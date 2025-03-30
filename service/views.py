@@ -301,7 +301,7 @@ def search_events(request):
     # Search events by title, content, or filter by multiple categories
     query = request.GET.get('q', '')  # Search query
     categories = request.GET.get('categories', '')  # Comma-separated category names
-    running = request.GET.get('running', '')
+    running = request.GET.get('running', '') # Events currently in progress or upcoming
     user_lat = request.GET.get('latitude')
     user_lon = request.GET.get('longitude')
     
