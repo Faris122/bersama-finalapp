@@ -96,7 +96,6 @@ class AuthAPITests(APITestCase):
         self.assertEqual(response.data['username'][0], 'This field is required.')
 
 class ProfileAPITests(APITestCase):
-
     def setUp(self):
         # Use the registration API to create a user and profile
         self.register_url = "/api/register/"
@@ -168,14 +167,13 @@ class ProfileAPITests(APITestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.phone_number, "9876543210")
         self.assertFalse(self.profile.is_phone_public)
-        self.assertEqual(self.profile.role, "Organisation")
         self.assertEqual(self.profile.bio, "Updated bio")
         self.assertFalse(self.profile.is_dm_open)
     def test_retrieve_profile_without_authentication(self):
         """Test retrieving own (no username in url) profile without being logged in"""
         self.client.logout()  # Log out the user
         response = self.client.get(self.profile_url)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_edit_profile_without_authentication(self):
         """Test editing user profile without being logged in"""

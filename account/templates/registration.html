@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5">
     <h1 class="text-center">Register</h1>
+    <!-- Inputs for Registration -->
     <div class="card p-4">
         <div class="mb-3">
             <label for="username" class="form-label">Username</label>
@@ -26,6 +26,53 @@
                 <option value="Organisation">Organisation</option>
             </select>
         </div>
+        <div class="mb-3">
+            <!-- Enter Postal Address -->
+            <div class="alert alert-info mb-3">
+                <p class="mb-1"><strong>Important:</strong> This is your complete postal address that will be used for all official purposes.</p>
+                <p class="mb-0">For individual users: Your address remains private.</p>
+            </div>
+            <label for="addressName" class="form-label">Enter your full postal address</label>
+            <input type="text" class="form-control" id="addressName" placeholder="Enter your postal address">
+        </div>
+        <!-- Enter Geolocation Search -->
+        <div class="mb-3">
+            <p class="mb-1">Help us pinpoint your location on the map to locate services near you.</p>
+            <label for="addressInput" class="form-label">Search Location</label>
+            <input type="text" class="form-control" id="addressInput" placeholder="Search Address for geolocation">
+        </div>
+        <button class="btn btn-primary w-100" onclick="searchAddress()">Search</button>
+        <!-- Results dynamically loaded -->
+        <ul class="list-group mt-1" id="addressResults"></ul>
+    
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+        <!-- Map display in the form of a modal -->
+        <button class="btn btn-secondary w-100 mt-3" onclick="openMap()">Open Map to Select Location</button>
+        <p class="text-muted">Map is not loaded initially to reduce bandwidth</p>
+    
+        <div class="modal fade" id="mapModal" tabindex="-1" aria-labelledby="mapModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="mapModalLabel">Select Location</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="map" style="height: 400px;"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Latitude and Longitude -->
+        <p class="my-0"><strong>Latitude:</strong> <span id='lat'></span></p>
+        <p><strong>Longitude:</strong> <span id='long'></span></p>
+
         <div class="mb-3">
             <label for="bio" class="form-label">Bio</label>
             <textarea id="bio" class="form-control" placeholder="Enter bio"></textarea>
@@ -105,7 +152,6 @@
         </div>
         <button class="btn btn-primary w-100" onclick="registerUser()">Register</button>
     </div>
-</div>
 
 <!-- Bootstrap Modal -->
 <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
@@ -128,6 +174,82 @@
 <!-- Bootstrap JS and Popper -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+    let map;
+    let marker;
+    let selectedLat;
+    let selectedLon;
+
+    // Map display function, loaded on click to reduce bandwidth
+    function openMap() {
+        // Default is set to Singapore
+        const initialLat = selectedLat || parseFloat(document.getElementById('lat').textContent) || 1.2902;
+        const initialLon = selectedLon || parseFloat(document.getElementById('long').textContent) || 103.85;
+
+        if (!map) {
+            map = L.map('map', { center: [initialLat, initialLon], zoom: 13 });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
+
+            marker.on('dragend', function (e) {
+                const pos = marker.getLatLng();
+                selectedLat = pos.lat;
+                selectedLon = pos.lng;
+                updateCoordsDisplay();
+                map.setView([selectedLat, selectedLon], map.getZoom()); // 👈 Keep map centered
+            });
+
+            // Ensure proper centring on load
+            map.whenReady(() => {
+                setTimeout(() => {
+                    map.invalidateSize();
+                    map.setView([initialLat, initialLon], 13);
+                }, 300); // Small delay to ensure proper map rendering
+            });
+
+        } else {
+            map.setView([initialLat, initialLon], 13);
+            marker.setLatLng([initialLat, initialLon]);
+        }
+
+        updateCoordsDisplay();
+        new bootstrap.Modal(document.getElementById('mapModal')).show();
+    }
+
+    //Searches address based on search input, displays results
+    async function searchAddress() {
+        const query = document.getElementById('addressInput').value;
+        if (!query) return alert("Please enter an address");
+
+        const response = await fetch(`/api/search-address/?query=${encodeURIComponent(query)}`);
+        const results = await response.json();
+
+        const resultsList = document.getElementById('addressResults');
+        // Set button sets the latitude and longitude
+        resultsList.innerHTML = results.map(item => `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                ${item.display_name}
+                <button class="btn btn-sm btn-success" onclick="saveAddress(${item.lat}, ${item.lon})">
+                    Set
+                </button>
+            </li>
+        `).join('');
+    }
+
+    // Both functions set the latitude and longitude, in the back and front ends respectively
+    function saveAddress(lat, lon) {
+        selectedLat = lat;
+        selectedLon = lon;
+        updateCoordsDisplay();
+    }
+
+    function updateCoordsDisplay() {
+        document.getElementById('lat').textContent = selectedLat?.toFixed(5) || '';
+        document.getElementById('long').textContent = selectedLon?.toFixed(5) || '';
+    }
+
+    // Displays Financial Profile on click
     function toggleFinancialProfile() {
         const needsHelpChecked = document.getElementById("needs_help").checked;
         const financialProfileSection = document.getElementById("financial-profile-section");
@@ -140,6 +262,9 @@
     }
     async function registerUser() {
         const formData = new FormData();
+        const parselat = parseFloat(selectedLat.toFixed(5));
+        const parselong = parseFloat(selectedLon.toFixed(5));
+        console.log(parselong)
         formData.append('username', document.getElementById('username').value);
         formData.append('password', document.getElementById('password').value);
         formData.append('email', document.getElementById('email').value);
@@ -149,6 +274,8 @@
         formData.append('needs_help', document.getElementById('needs_help').checked);
         formData.append('is_dm_open', document.getElementById('is_dm_open').checked);
         formData.append('is_phone_public', document.getElementById('is_phone_public').checked);
+        formData.append('latitude', parselat);
+        formData.append('longitude', parselong);
 
         const profilePicture = document.getElementById('profile_picture').files[0];
         if (profilePicture) {

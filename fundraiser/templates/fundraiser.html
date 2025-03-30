@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% block content %}
+<!-- Fundraiser Details Card -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 id="fundraiser-title" class="card-title"></h2>
+            </div>
+            <div class="card-body">
+                <p id="fundraiser-description" class="card-text"></p>
+                <p><strong>Start Date:</strong> <span id="fundraiser-start-date"></span></p>
+                <p><strong>End Date:</strong> <span id="fundraiser-end-date"></span></p>
+            </div>
+            <div class="card-footer text-muted" id="fundraiser-user"></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <!-- Donation Progress Bar -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title">Donation Progress</h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3">
+                    <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <p><strong>$<span id="raised-amount">0</span> raised of $<span id="goal-amount">0</span></strong></p>
+            </div>
+        </div>
+
+        <!-- Recent Donations -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">Recent Donations</h5>
+            </div>
+            <div class="card-body p-0">
+                <!-- Scrollable Donations List -->
+                <div class="donations-container" style="max-height: 200px; overflow-y: auto;">
+                    <ul id="recent-donations" class="list-group list-group-flush">
+                        <!-- Donations will be dynamically added here -->
+                    </ul>
+                </div>
+                <!-- Donate Now Button if fundraiser is running, else show text saying it ended -->
+                <div class="text-center mt-3" id="donation-status">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Comment Form -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3>Post a Comment</h3>
+    </div>
+    <div class="card-body">
+        {% if user.is_authenticated %}
+        <form id="comment-form">
+            <div class="mb-3">
+                <textarea id="comment-content" class="form-control" rows="3" placeholder="Write a comment..."></textarea>
+            </div>
+            <input type="hidden" id="parent-id" value="">
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+        {% else %}
+        <p>Log in/Register to post a comment</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Comments Section -->
+<div class="card">
+    <div class="card-header">
+        <h3>Comments</h3>
+    </div>
+    <div class="card-body" id="comments-container">
+    </div>
+</div>
+
+<script>
+    // Function to toggle an inline reply form
+    function toggleReplyForm(commentId, container) {
+        // Check if a reply form already exists inside the container
+        let replyForm = container.querySelector('.reply-form');
+        if (replyForm) {
+            // If it exists, remove it (toggle off)
+            replyForm.remove();
+        } else {
+            // Otherwise, create a new reply form
+            replyForm = document.createElement('div');
+            replyForm.classList.add('reply-form', 'mt-2');
+            replyForm.innerHTML = `
+                <textarea class="form-control reply-content" rows="2" placeholder="Write a reply..."></textarea>
+                <button class="btn btn-sm btn-primary mt-2 submit-reply" data-parent-id="${commentId}">Submit Reply</button>
+            `;
+            container.appendChild(replyForm);
+
+            // Attach event listener to the "Submit Reply" button
+            replyForm.querySelector('.submit-reply').addEventListener('click', () => {
+                const replyContent = replyForm.querySelector('.reply-content').value.trim();
+                if (!replyContent) {
+                    alert('Reply cannot be empty.');
+                    return;
+                }
+                // Post the reply via API
+                fetch(`/api/fundraisers/{{ fundraiser.id }}/add_comment/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ content: replyContent, parent: commentId })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to post reply');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert("Reply posted successfully!");
+                    // Reload the page or re-fetch comments
+                    location.reload();
+                })
+                .catch(error => {
+                    console.error('Error posting reply:', error);
+                    alert('Error posting reply.');
+                });
+            });
+        }
+    }
+
+    // renderComments to display comments dynamically
+    function renderComments(comments, parentElement = null) {
+        console.log(comments);
+        const currentUser = "{{ user.username }}";
+        const container = parentElement || document.getElementById("comments-container");
+        container.innerHTML = ""; // Clear existing comments
+
+        comments.forEach(comment => {
+            const commentDiv = document.createElement("div");
+            commentDiv.classList.add("border", "p-3", "mb-3", "rounded");
+            commentDiv.id = `comment-${comment.id}`; // Unique ID for each comment
+
+            // Build HTML for the comment, including a Reply button if user is logged in
+            // If the current user is the comment's author, include a Delete button.
+            commentDiv.innerHTML = `
+                <p>
+                <strong><a href="/profile/${comment.author_username}" class="text-decoration-none">@${comment.author_username}</a></strong>
+                <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                </p>
+                <p>${comment.content}</p>
+                <div class="d-flex gap-2">
+                    ${currentUser === "" ? "" : `<button class="btn btn-sm btn-outline-primary reply-btn" data-id="${comment.id}">Reply</button>`}
+                    ${currentUser === comment.author_username ? `<button class="btn btn-sm btn-danger delete-btn" data-id="${comment.id}">Delete</button>` : ""}
+                </div>
+                <div id="replies-${comment.id}" class="ms-4"></div>
+            `;
+
+            container.appendChild(commentDiv);
+
+            // Render nested replies if available
+            if (comment.replies && comment.replies.length > 0) {
+                renderComments(comment.replies, commentDiv.querySelector(`#replies-${comment.id}`));
+            }
+
+            if(currentUser){
+                // Attach event listener to the reply button for this comment
+                const replyBtn = commentDiv.querySelector('.reply-btn');
+                replyBtn.addEventListener("click", () => {
+                    const repliesContainer = commentDiv.querySelector(`#replies-${comment.id}`);
+                    toggleReplyForm(comment.id, repliesContainer);
+                });
+            }
+
+            // Attach event listener for delete button if it exists
+            const deleteBtn = commentDiv.querySelector('.delete-btn');
+            if (deleteBtn) {
+                
+                deleteBtn.addEventListener("click", (event) => {
+                    event.preventDefault(); // Ensure default behavior doesn't interfere
+                    event.stopPropagation(); // Stop event from bubbling up
+
+                    const commentId = event.target.getAttribute("data-id"); // Get the correct comment ID
+                    console.log(commentId)
+                    console.log(`${comment.id}: ${comment.content}`)
+                    if(commentId==comment.id){
+                        if (confirm("Are you sure you want to delete this comment?")) {
+                            fetch(`/api/fundraisers/comments/${comment.id}/delete/`, {
+                                method: "DELETE",
+                                headers: {
+                                    "X-CSRFToken": "{{ csrf_token }}"
+                                }
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error("Failed to delete comment.");
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                alert("Comment deleted successfully!");
+                                location.reload();
+                            })
+                            .catch(error => {
+                                console.error("Error deleting comment:", error);
+                                alert("Error deleting comment.");
+                            });
+                        }
+
+                    }
+                });
+            }
+        });
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+        const currentUser = "{{ user.username }}";
+        const fundraiserId = "{{ fundraiser.id }}";
+
+        // Fetch Fundraiser Details
+        fetch(`/api/fundraisers/${fundraiserId}/`)
+            .then(response => response.json())
+            .then(data => {
+                // Populate Fundraiser Details
+                document.getElementById("fundraiser-title").textContent = data.title;
+                document.getElementById("fundraiser-description").textContent = data.description;
+                document.getElementById("goal-amount").textContent = data.goal_amount;
+                document.getElementById("fundraiser-start-date").textContent = new Date(data.start_date).toLocaleString();
+                document.getElementById("fundraiser-end-date").textContent = new Date(data.end_date).toLocaleString();
+                document.getElementById("fundraiser-user").textContent = `@${data.username}`;
+
+                // Check if fundraiser is still active, display either button or text for donationStatus
+                const endDate = new Date(data.end_date);
+                const isActive = new Date() <= endDate;
+                const donationStatus = document.getElementById('donation-status');
+                
+                if (isActive) {
+                    donationStatus.innerHTML = `
+                        <a href="{% url 'donation_page' fundraiser.id %}" class="btn btn-primary">Donate Now</a>
+                    `;
+                } else {
+                    donationStatus.innerHTML = `
+                        <p class="text-muted">This fundraiser has ended</p>
+                    `;
+                }
+
+                // Update Progress Bar
+                const progressBar = document.getElementById("progress-bar");
+                const raisedAmount = document.getElementById("raised-amount");
+                const goalAmount = document.getElementById("goal-amount");
+                const amountRaised = data.amount_raised || 0;
+                const goalAmountValue = parseFloat(data.goal_amount);
+                const progressPercentage = (amountRaised / goalAmountValue) * 100;
+
+                progressBar.style.width = `${progressPercentage}%`;
+                progressBar.setAttribute("aria-valuenow", progressPercentage);
+                raisedAmount.textContent = amountRaised.toFixed(2);
+                goalAmount.textContent = goalAmountValue.toFixed(2);
+                renderComments(data.comments);
+
+            })
+            .catch(error => console.error("Error fetching fundraiser details:", error));
+
+        // Fetch Recent Donations
+        fetch(`/api/fundraisers/${fundraiserId}/donations/`)
+            .then(response => response.json())
+            .then(data => {
+                const donationsList = document.getElementById("recent-donations");
+                data.forEach(donation => {
+                    const listItem = document.createElement("li");
+                    listItem.classList.add("list-group-item");
+                    listItem.innerHTML = `
+                        <strong>${donation.user ? donation.username : donation.anon_name}</strong>
+                        donated $${donation.amount}
+                        <br><small>${new Date(donation.created_at).toLocaleString()}</small>
+                        ${donation.message ? `<br><em>"${donation.message}"</em>` : ''}
+                    `;
+                    donationsList.appendChild(listItem);
+                });
+            })
+            .catch(error => console.error("Error fetching donations:", error));
+
+        // Global comment form (for top-level comments)
+        document.getElementById("comment-form").addEventListener("submit", event => {
+            event.preventDefault();
+
+            const content = document.getElementById("comment-content").value.trim();
+            const parentId = document.getElementById("parent-id").value;
+
+            if (!content) {
+                alert("Comment cannot be empty!");
+                return;
+            }
+
+            fetch(`/api/fundraisers/{{ fundraiser.id }}/add_comment/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: JSON.stringify({ content, parent: parentId })
+            })
+            .then(response => response.json())
+            .then(() => location.reload())
+            .catch(error => console.error("Error posting comment:", error));
+        });
+    });
+</script>
+{% endblock %}

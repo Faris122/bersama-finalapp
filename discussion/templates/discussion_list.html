@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="text-primary">Discussion</h1>
+    <div>
+        {% if user.is_authenticated %}
+            <a href="{% url 'create_discussion' %}" class="btn btn-success">Create Discussion</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Search Bar & Category Filter -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" id="search-query" class="form-control" placeholder="Search discussions...">
+    </div>
+    <div class="col-md-4">
+        <select id="category-filter" class="form-select">
+            <option value="">Select Category</option>
+            <!-- Categories will be dynamically loaded here -->
+        </select>
+    </div>
+    <div class="col-md-2 d-flex">
+        <button id="reset-filters" class="btn btn-secondary w-100">Reset</button>
+    </div>
+</div>
+
+<div id="discussion-list" class="row">
+    <!-- Discussions will be dynamically inserted here -->
+</div>
+
+<script>
+    // Pass initial data (in GET) from Django to JavaScript
+    const initialQuery = '{{ initial_query |safe }}';
+    const initialCategories = {{ initial_categories|safe }};
+    let query = initialQuery;
+    let selectedCategories = initialCategories;  // Initialize with URL parameters
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const discussionList = document.getElementById('discussion-list');
+        const searchInput = document.getElementById('search-query');
+        const categoryFilter = document.getElementById('category-filter');
+        const resetButton = document.getElementById('reset-filters');
+
+        // Discussions displayed depends on query and categories passed in parameters (from search)
+        function fetchDiscussions(query = '', categories = []) {
+            let url = `/api/discussions/search/?q=${query}`;
+            if (categories.length) {
+                url += `&categories=${categories.join(',')}`;
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        discussionList.innerHTML = `<div class="alert alert-warning">No discussions found.</div>`;
+                        return;
+                    }
+                    discussionList.innerHTML = data.map(discussion => `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="/discussions/${discussion.id}/" class="text-decoration-none text-dark">
+                                            ${discussion.title}
+                                        </a>
+                                    </h5>
+                                    <p class="card-text">
+                                        <strong>Categories:</strong> 
+                                        ${discussion.categories.map(cat => {
+                                            const colours = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+                                            const colour = colours[cat.id % colours.length];
+                                            const isActive = selectedCategories.includes(cat.name) ? 'active' : '';
+                                            return `<a href="#" class="badge bg-${colour} me-1 ${isActive}" 
+                                                    data-category-name="${cat.name}">${cat.name}</a>`;
+                                        }).join('')}
+                                    </p>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">
+                                            By <a href="/profile/${discussion.author_username}/" class="text-decoration-none">
+                                                @${discussion.author_username}
+                                            </a>
+                                        </small>
+                                        <small class="text-muted">${new Date(discussion.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => console.error('Error fetching discussions:', error));
+        }
+
+        // Categories for display in dropdown
+        function fetchCategories() {
+            fetch('/api/discussions/categories/')
+                .then(response => response.json())
+                .then(categories => {
+                    const categoryFilter = document.getElementById('category-filter');
+                    categoryFilter.innerHTML = `<option value="">Select Category</option>` + categories.map(category => `
+                        <option value="${category.name}" ${selectedCategories.includes(category.name) ? 'selected' : ''}>
+                            ${category.name}
+                        </option>
+                    `).join('');
+                })
+                .catch(error => console.error('Error loading categories:', error));
+        }
+
+        // Add click handler for category badges
+        document.getElementById('discussion-list').addEventListener('click', function(e) {
+            const badge = e.target.closest('[data-category-name]');
+            if (badge) {
+                e.preventDefault();
+                const categoryName = badge.dataset.categoryName;
+                const index = selectedCategories.indexOf(categoryName);
+                
+                if (index === -1) {
+                    selectedCategories.push(categoryName);
+                } else {
+                    selectedCategories.splice(index, 1);
+                }
+                
+                const query = searchInput.value;
+                fetchDiscussions(query, selectedCategories);
+            }
+        });
+
+        // Event Listeners, sets query and category values, or resets them
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value;
+            fetchDiscussions(query, selectedCategories);
+        });
+
+        categoryFilter.addEventListener('change', () => {
+            const query = searchInput.value;
+            const selectedCategory = categoryFilter.value;
+            selectedCategories = selectedCategory ? [selectedCategory] : [];
+            fetchDiscussions(query, selectedCategories);
+        });
+
+        resetButton.addEventListener('click', () => {
+            searchInput.value = '';
+            categoryFilter.value = '';
+            selectedCategories = [];
+            fetchDiscussions();
+        });
+
+        // Initial Load
+        fetchCategories();
+        fetchDiscussions(query, selectedCategories);
+    });
+</script>
+
+{% endblock %}

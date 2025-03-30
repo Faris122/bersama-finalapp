@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% block content %}
+<!-- Discussion Details Card -->
+<div class="card mb-4">
+    <div class="card-header">
+    <h2 id="event-title" class="card-title"></h2>
+    <div id="event-status"></div>
+    </div>
+    <div class="card-body">
+        <p><strong>Categories:</strong> <span id="event-categories"></span></p>
+        <p id="event-content" class="card-text"></p>
+        <p><strong>Address:</strong> <span id="event-address"></span></p>
+        <p><strong>Email:</strong> <span id="event-email"></span></p>
+        <p><strong>Phone:</strong> <span id="event-phone"></span></p>
+        <p><strong>Event Period:</strong> <span id="event-period"></span></p>
+    </div>
+    <div class="card-footer text-muted" id="event-date"></div>
+</div>
+
+<!-- Comment Form -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3>Post a Comment</h3>
+    </div>
+    <div class="card-body">
+        {% if user.is_authenticated %}
+        <form id="comment-form">
+            <div class="mb-3">
+                <textarea id="comment-content" class="form-control" rows="3" placeholder="Write a comment..."></textarea>
+            </div>
+            <input type="hidden" id="parent-id" value="">
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+        {% else %}
+        <p>Log in/Register to post a comment</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Comments Section -->
+<div class="card">
+    <div class="card-header">
+        <h3>Comments</h3>
+    </div>
+    <div class="card-body" id="comments-container">
+    </div>
+</div>
+
+<script>
+    // Function to toggle an inline reply form
+    function toggleReplyForm(commentId, container) {
+        // Check if a reply form already exists inside the container
+        let replyForm = container.querySelector('.reply-form');
+        if (replyForm) {
+            // If it exists, remove it (toggle off)
+            replyForm.remove();
+        } else {
+            // Otherwise, create a new reply form
+            replyForm = document.createElement('div');
+            replyForm.classList.add('reply-form', 'mt-2');
+            replyForm.innerHTML = `
+                <textarea class="form-control reply-content" rows="2" placeholder="Write a reply..."></textarea>
+                <button class="btn btn-sm btn-primary mt-2 submit-reply" data-parent-id="${commentId}">Submit Reply</button>
+            `;
+            container.appendChild(replyForm);
+
+            // Attach event listener to the "Submit Reply" button
+            replyForm.querySelector('.submit-reply').addEventListener('click', () => {
+                const replyContent = replyForm.querySelector('.reply-content').value.trim();
+                if (!replyContent) {
+                    alert('Reply cannot be empty.');
+                    return;
+                }
+                // Post the reply via API
+                fetch(`/api/events/{{ event.id }}/add_comment/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ content: replyContent, parent: commentId })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to post reply');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert("Reply posted successfully!");
+                    // Reload the page or re-fetch comments
+                    location.reload();
+                })
+                .catch(error => {
+                    console.error('Error posting reply:', error);
+                    alert('Error posting reply.');
+                });
+            });
+        }
+    }
+
+    // renderComments to display comments dynamically
+    function renderComments(comments, parentElement = null) {
+        const currentUser = "{{ user.username }}";
+        const container = parentElement || document.getElementById("comments-container");
+        container.innerHTML = ""; // Clear existing comments
+
+        comments.forEach(comment => {
+            const commentDiv = document.createElement("div");
+            commentDiv.classList.add("border", "p-3", "mb-3", "rounded");
+            commentDiv.id = `comment-${comment.id}`; // Unique ID for each comment
+
+            // Build HTML for the comment, including a Reply button if user is logged in
+            // If the current user is the comment's author, include a Delete button.
+            commentDiv.innerHTML = `
+                <p>
+                <strong><a href="/profile/${comment.author_username}" class="text-decoration-none">@${comment.author_username}</a></strong>
+                <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                </p>
+                <p>${comment.content}</p>
+                <div class="d-flex gap-2">
+                    ${currentUser === "" ? "" : `<button class="btn btn-sm btn-outline-primary reply-btn" data-id="${comment.id}">Reply</button>`}
+                    ${currentUser === comment.author_username ? `<button class="btn btn-sm btn-danger delete-btn" data-id="${comment.id}">Delete</button>` : ""}
+                </div>
+                <div id="replies-${comment.id}" class="ms-4"></div>
+            `;
+
+            container.appendChild(commentDiv);
+
+            // Render nested replies if available
+            if (comment.replies && comment.replies.length > 0) {
+                renderComments(comment.replies, commentDiv.querySelector(`#replies-${comment.id}`));
+            }
+
+            // Attach event listener to the reply button for this comment
+            const replyBtn = commentDiv.querySelector('.reply-btn');
+            replyBtn.addEventListener("click", () => {
+                const repliesContainer = commentDiv.querySelector(`#replies-${comment.id}`);
+                toggleReplyForm(comment.id, repliesContainer);
+            });
+
+            // Attach event listener for delete button if it exists
+            const deleteBtn = commentDiv.querySelector('.delete-btn');
+            if (deleteBtn) {
+                
+                deleteBtn.addEventListener("click", (event) => {
+                    event.preventDefault(); // Ensure default behavior doesn't interfere
+                    event.stopPropagation(); // Stop event from bubbling up
+
+                    const commentId = event.target.getAttribute("data-id"); // Get the correct comment ID
+                    console.log(commentId)
+                    console.log(`${comment.id}: ${comment.content}`)
+                    if(commentId==comment.id){
+                        if (confirm("Are you sure you want to delete this comment?")) {
+                            fetch(`/api/events/comments/${comment.id}/delete/`, {
+                                method: "DELETE",
+                                headers: {
+                                    "X-CSRFToken": "{{ csrf_token }}"
+                                }
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error("Failed to delete comment.");
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                alert("Comment deleted successfully!");
+                                location.reload(); // or re-fetch comments if you prefer
+                            })
+                            .catch(error => {
+                                console.error("Error deleting comment:", error);
+                                alert("Error deleting comment.");
+                            });
+                        }
+
+                    }
+                });
+            }
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        // Determine event status
+        let status;
+        let badgeClass;
+        const currentUser = "{{ user.username }}";
+        fetch(`/api/events/{{ event.id }}/`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("event-title").textContent = data.title;
+                document.getElementById("event-content").textContent = data.content;
+                document.getElementById("event-address").textContent = data.address;
+                document.getElementById("event-email").textContent = data.email_contact || "N/A";
+                document.getElementById("event-phone").textContent = data.phone_contact || "N/A";
+                document.getElementById("event-period").textContent = `${new Date(data.datetime_start).toLocaleString()}-${new Date(data.datetime_end).toLocaleString()}`;
+                document.getElementById("event-categories").innerHTML = data.categories.map(cat => {
+                    console.log(cat.id)
+                    const colours = ['primary', 'secondary', 'success', 'danger', 
+                                'warning', 'info', 'light', 'dark'];
+                    const colour = colours[cat.id % colours.length];
+                    return `<a href="/events/?categories=${encodeURIComponent(cat.name)}" 
+                            class="badge bg-${colour} me-1">${cat.name}</a>`;
+                }).join(' ');
+                document.getElementById("event-date").textContent = 
+                    `Created on ${new Date(data.created_at).toLocaleString()}`;
+                renderComments(data.comments);
+
+                const now = new Date();
+                const startDate = new Date(data.datetime_start);
+                const endDate = new Date(data.datetime_end);
+
+                if (now < startDate) {
+                    status = 'Upcoming';
+                    badgeClass = 'bg-info';
+                } else if (now >= startDate && now <= endDate) {
+                    status = 'In Progress';
+                    badgeClass = 'bg-success';
+                } else {
+                    status = 'Completed';
+                    badgeClass = 'bg-secondary';
+                }
+                document.getElementById("event-status").innerHTML = `<span class="badge ${badgeClass}">${status}</span>`
+
+            })
+            .catch(error => console.error("Error fetching event details:", error));
+
+        // Global comment form (for top-level comments)
+        document.getElementById("comment-form").addEventListener("submit", event => {
+            event.preventDefault();
+            
+            const content = document.getElementById("comment-content").value.trim();
+            const parentId = document.getElementById("parent-id").value;
+
+            if (!content) {
+                alert("Comment cannot be empty!");
+                return;
+            }
+
+            fetch(`/api/events/{{ event.id }}/add_comment/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: JSON.stringify({ content, parent: parentId })
+            })
+            .then(response => response.json())
+            .then(() => location.reload())
+            .catch(error => console.error("Error posting comment:", error));
+        });
+    });
+</script>
+{% endblock %}

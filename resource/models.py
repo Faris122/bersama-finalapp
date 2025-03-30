@@ -19,10 +19,25 @@ class Resource(models.Model):
     max_income_pc = models.FloatField(blank=True, null=True)
     min_income_gross = models.FloatField(blank=True, null=True)
     max_income_gross = models.FloatField(blank=True, null=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
+    
+class Bursary(Resource):  
+    LEVEL_CHOICES = [  
+        ('primary', 'Primary'),  
+        ('secondary', 'Secondary'),  
+        ('tertiary', 'Tertiary')  
+    ]  
+
+    deadline = models.DateField(blank=True,null=True)
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES)  
+    categories = None
+
+    def __str__(self):  
+        return f"{self.title} ({self.get_level_display()})"
     
 class ResourceComment(models.Model):
     post = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name='comments')

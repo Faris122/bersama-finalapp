@@ -13,6 +13,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
     website = serializers.CharField(required=False, allow_blank=True)
     is_dm_open = serializers.BooleanField(required=False, default=True)
     is_phone_public = serializers.BooleanField(required=False, default=True)
+    address = serializers.CharField(required=False, allow_blank=True)
+    latitude = serializers.DecimalField(required=False, allow_null=True,max_digits=9,decimal_places=5)
+    longitude = serializers.DecimalField(required=False, allow_null=True,max_digits=9,decimal_places=5)
 
     # Financial Profile Fields (Only needed if needs_help=True)
     own_income = serializers.DecimalField(required=False, max_digits=10, decimal_places=2, allow_null=True)
@@ -31,27 +34,20 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'username', 'password', 'email', 'phone_number', 'role', 'needs_help',
             'bio', 'profile_picture', 'website', 'is_dm_open', 'is_phone_public',
             'own_income', 'household_income', 'household_members',
-            'employment_status', 'housing_status'
+            'employment_status', 'housing_status', 'latitude', 'longitude','address'
         ]
         extra_kwargs = {
             'password': {'write_only': True}
         }
 
     def validate(self, data):
-        """
-        Ensures that:
-        1. Only Public users can request help.
-        2. If `needs_help=True`, financial profile fields must be filled.
-        """
+        # Ensures only public users with Needs Help ticked can request help
         if data.get("needs_help", False) and data.get("role") != "Public":
             raise serializers.ValidationError("Only Public users can request help.")
 
         return data
 
-    def create(self, validated_data):
-        """
-        Creates a User, associated Profile, and FinancialProfile (if needed).
-        """
+    def create(self, validated_data) :#Creates a User, associated Profile, and FinancialProfileif needed
         # Extract financial data
         financial_data = {
             'own_income': validated_data.pop('own_income', None),
@@ -70,7 +66,10 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'profile_picture': validated_data.pop('profile_picture', None),
             'website': validated_data.pop('website', ''),
             'is_dm_open': validated_data.pop('is_dm_open', True),
-            'is_phone_public': validated_data.pop('is_phone_public', True)
+            'is_phone_public': validated_data.pop('is_phone_public', True),
+            'address': validated_data.pop('address', None),
+            'latitude': validated_data.pop('latitude', None),
+            'longitude': validated_data.pop('longitude', None),
         }
 
         # Create User
@@ -84,9 +83,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
         return user
 
     def update(self, instance, validated_data):
-        """
-        Updates a User, Profile, and FinancialProfile.
-        """
         profile = instance.profile  # Get associated profile
 
         # Update Profile fields
@@ -98,6 +94,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
         profile.website = validated_data.get('website', profile.website)
         profile.is_dm_open = validated_data.get('is_dm_open', profile.is_dm_open)
         profile.is_phone_public = validated_data.get('is_phone_public', profile.is_phone_public)
+        profile.address = validated_data.get('address', profile.address)
+        profile.latitude = validated_data.get('latitude', profile.latitude)
+        profile.longitude = validated_data.get('longitude', profile.longitude)
 
         # Update Financial Profile if needed
         if profile.needs_help:
@@ -113,7 +112,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
         return instance
 
 
-    
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -139,7 +137,8 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = [
             'username', 'phone_number', 'is_phone_public', 'role', 
-            'bio', 'profile_picture', 'website', 'is_dm_open', 'needs_help'
+            'bio', 'profile_picture', 'website', 'is_dm_open', 'needs_help',
+            'address','latitude','longitude'
         ]
 
     def to_representation(self, instance):
@@ -148,8 +147,15 @@ class ProfileSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         user = request.user if request else None
 
+        # Do not display phone number if user does not consent
         if not instance.is_phone_public and user != instance.user:
             representation.pop('phone_number', None)
+
+        # Do not display address if user does not match
+        if user != instance.user:
+            representation.pop('address',None),
+            representation.pop('latitude',None),
+            representation.pop('longitude',None)
 
         return representation
     
@@ -157,7 +163,7 @@ class ProfileEditSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = ['phone_number', 'is_phone_public', 'role', 'bio', 
-                  'profile_picture', 'website', 'is_dm_open']
+                  'profile_picture', 'website', 'is_dm_open','address', 'latitude','longitude']
 
 
 class FinancialProfileSerializer(serializers.ModelSerializer):
@@ -167,11 +173,7 @@ class FinancialProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['profile']
 
     def validate(self, data):
-        """
-        Ensures:
-        - Only public users can set `needs_help = True`
-        - Only the owner can modify their financial profile
-        """
+
         request = self.context.get('request')
         user = self.context['request'].user
 
@@ -186,11 +188,6 @@ class FinancialProfileSerializer(serializers.ModelSerializer):
         return data
 
     def to_representation(self, instance):
-        """
-        - Users can see their own financial profile
-        - Organisations can see all profiles
-        - Others get restricted access
-        """
         request = self.context.get('request')
         user = request.user
         data = super().to_representation(instance)
@@ -205,5 +202,26 @@ class FinancialProfileSerializer(serializers.ModelSerializer):
                 data[field] = "Restricted"
 
         return data
+
+
+class ChatSerializer(serializers.ModelSerializer):
+    unread_count = serializers.SerializerMethodField()
+    user1_username = serializers.CharField(source='user1.username', read_only=True)
+    user2_username = serializers.CharField(source='user2.username', read_only=True)
+
+    class Meta:
+        model = Chat
+        fields = ['id', 'user1_username', 'user2_username', 'created_at', 'unread_count']
+
+    def get_unread_count(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.unread_message_count(request.user)
+        return 0
+
+class MessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Message
+        fields = '__all__'
 
 

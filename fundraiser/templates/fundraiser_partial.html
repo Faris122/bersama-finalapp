@@ -1,0 +1,181 @@
+<!-- Bootstrap Nav Tabs -->
+<ul class="nav nav-tabs" id="profileTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="fundraiser-posts-tab" data-bs-toggle="tab" data-bs-target="#fundraiser-posts" type="button" role="tab" aria-controls="fundraiser-posts" aria-selected="true">
+            Posts
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="fundraiser-comments-tab" data-bs-toggle="tab" data-bs-target="#fundraiser-comments" type="button" role="tab" aria-controls="fundraiser-comments" aria-selected="false">
+            Comments
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="donations-tab" data-bs-toggle="tab" data-bs-target="#donations" type="button" role="tab" aria-controls="donations" aria-selected="false">
+            Donations
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content mt-3" id="profileTabsContent">
+    <!-- Posts Tab -->
+    <div class="tab-pane fade show active" id="fundraiser-posts" role="tabpanel" aria-labelledby="fundraiser-posts-tab">
+        <div id="fundraiser-list" class="row">
+            <!-- Discussions will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <!-- Comments Tab -->
+    <div class="tab-pane fade" id="fundraiser-comments" role="tabpanel" aria-labelledby="fundraiser-comments-tab">
+        <div id="fundraiser-comment-list" class="row">
+            <!-- Comments will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <!-- Donations Tab -->
+    <div class="tab-pane fade" id="donations" role="tabpanel" aria-labelledby="donations-tab">
+        <div id="donation-list" class="row">
+            <!-- Donations will be dynamically inserted here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const user = "{{username|safe}}";
+        const fundraiserList = document.getElementById('fundraiser-list');
+        const commentList = document.getElementById('fundraiser-comment-list');
+        const donationList = document.getElementById('donation-list');
+
+        function fetchFundraisers() {
+            fetch(`/api/fundraisers/posted_by/${user}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        fundraiserList.innerHTML = `<div class="alert alert-warning">No fundraisers found.</div>`;
+                        return;
+                    }
+                    fundraiserList.innerHTML = data.map(fundraiser => {
+                        const currentDate = new Date();
+                        const endDate = new Date(fundraiser.end_date);
+                        const isOverdue = currentDate > endDate;
+                        const progressPercentage = Math.min((fundraiser.amount_raised / fundraiser.goal_amount) * 100, 100);
+                        
+                        return `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title mb-0">
+                                            <a href="/fundraisers/${fundraiser.id}/" class="text-decoration-none text-dark">
+                                                ${fundraiser.title}
+                                            </a>
+                                        </h5>
+                                        <span class="badge ${isOverdue ? 'bg-danger' : 'bg-success'}">
+                                            ${isOverdue ? 'Overdue' : 'In Progress'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small class="text-muted">
+                                            By <a href="/profile/${fundraiser.username}/" class="text-decoration-none">
+                                                @${fundraiser.username}
+                                            </a>
+                                        </small>
+                                        <small class="text-muted">
+                                            Due: ${endDate.toLocaleDateString()}
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="progress mb-2" style="height: 20px;">
+                                        <div class="progress-bar bg-primary" 
+                                            role="progressbar" 
+                                            style="width: ${progressPercentage}%" 
+                                            aria-valuenow="${progressPercentage}" 
+                                            aria-valuemin="0" 
+                                            aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">
+                                            Raised: $${fundraiser.amount_raised}
+                                        </small>
+                                        <small class="text-muted">
+                                            Goal: $${fundraiser.goal_amount}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                })
+                .catch(error => console.error('Error fetching fundraisers:', error));
+        }
+
+        function fetchComments() {
+            fetch(`/api/fundraisers/commented_by/${user}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        commentList.innerHTML = `<div class="alert alert-warning">No comments found.</div>`;
+                        return;
+                    }
+                    commentList.innerHTML = data.map(comment => `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="/fundraisers/${comment.post.id}/" class="text-decoration-none text-dark">
+                                            ${comment.post.title}
+                                        </a>
+                                    </h5>
+                                    <p class="card-text">${comment.content}</p>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => console.error('Error fetching comments:', error));
+        }
+
+        function fetchDonations(){
+            fetch(`/api/fundraisers/donated_by/${user}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        donationList.innerHTML = `<div class="alert alert-warning">No donations found.</div>`;
+                        return;
+                    }
+                    donationList.innerHTML = data.map(donation => `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="/fundraisers/${donation.fundraiser.id}/" class="text-decoration-none text-dark">
+                                            ${donation.fundraiser.title}
+                                        </a>
+                                    </h5>
+                                    <p class="card-text"><strong>$${donation.amount}</strong></p>
+                                    <p class="card-text">${donation.message}</p>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">${new Date(donation.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => console.error('Error fetching comments:', error));
+        }
+
+        fetchFundraisers();
+        fetchComments();
+        fetchDonations();
+    });
+</script>

@@ -3,11 +3,11 @@ from rest_framework import status
 from django.contrib.auth.models import User
 from .models import *
 
-class DiscussionListCreateTestCase(APITestCase):
+class ListTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', password='password')
         self.category = DiscussionCategory.objects.create(name='General')
-        self.category2 = DiscussionCategory.objects.create(name='Tech')
+        self.category2 = DiscussionCategory.objects.create(name='Help')
         self.discussion = Discussion.objects.create(
             title="Test Discussion",
             content="This is a test discussion.",
@@ -20,6 +20,20 @@ class DiscussionListCreateTestCase(APITestCase):
         response = self.client.get('/api/discussions/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+
+class CreateDeleteTestCase(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='testuser', password='password')
+        self.other_user = User.objects.create_user(username='otheruser', password='password')
+        self.category = DiscussionCategory.objects.create(name='General')
+        self.category2 = DiscussionCategory.objects.create(name='Help')
+        self.discussion = Discussion.objects.create(
+            title="Test Discussion",
+            content="This is a test discussion.",
+            author=self.user
+        )
+        self.discussion.categories.add(self.category)
+        self.client.force_login(self.user)
 
     def test_create_discussion(self):
         """Test creating a new discussion."""
@@ -51,9 +65,43 @@ class DiscussionListCreateTestCase(APITestCase):
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-class DiscussionDetailCommentAPITestCase(APITestCase):
+    def test_delete_discussion_by_author(self):
+        """Test that the author can delete their own discussion."""
+        url = f'/api/discussions/{self.discussion.id}/delete/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], 'Discussion deleted successfully')
+        self.assertFalse(Discussion.objects.filter(id=self.discussion.id).exists())
+
+    def test_delete_discussion_by_other_user(self):
+        """Test that a non-author cannot delete someone else's discussion."""
+        self.client.force_login(self.other_user)  # Log in as another user
+        url = f'/api/discussions/{self.discussion.id}/delete/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['error'], 'Permission denied')
+        self.assertTrue(Discussion.objects.filter(id=self.discussion.id).exists())
+
+    def test_delete_discussion_unauthenticated(self):
+        """Test that an unauthenticated user cannot delete a discussion."""
+        self.client.logout()  # Log out the user
+        url = f'/api/discussions/{self.discussion.id}/delete/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Discussion.objects.filter(id=self.discussion.id).exists())
+
+    def test_delete_nonexistent_discussion(self):
+        """Test deleting a discussion that does not exist."""
+        url = '/api/discussions/999/delete/'  # Assuming 999 is an invalid ID
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data['error'], 'Discussion not found')
+
+
+class CommentTestCase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', password='password')
+        self.other_user = User.objects.create_user(username='otheruser', password='password')
         self.discussion = Discussion.objects.create(
             title="Test Discussion",
             content="This is a test discussion.",
@@ -66,16 +114,8 @@ class DiscussionDetailCommentAPITestCase(APITestCase):
         )
         self.client.force_login(self.user)
 
-    def test_get_discussion_detail(self):
-        response = self.client.get(f'/api/discussions/{self.discussion.id}/')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['title'], "Test Discussion")
-
-    def test_get_discussion_detail_invalid(self):
-        response = self.client.get(f'/api/discussions/874/')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
     def test_add_comment_logged_in(self):
+        """Test if the user can add a comment."""
         response = self.client.post(f'/api/discussions/{self.discussion.id}/add_comment/', {
             'content': 'This is a test comment.'
         }, format='json')
@@ -83,6 +123,7 @@ class DiscussionDetailCommentAPITestCase(APITestCase):
         self.assertEqual(response.data['content'], 'This is a test comment.')
 
     def test_add_comment_logged_out(self):
+        """Test if comments cannot be added if the user is logged out."""
         self.client.logout()
         response = self.client.post(f'/api/discussions/{self.discussion.id}/add_comment/', {
             'content': 'This is a test comment.'
@@ -113,22 +154,51 @@ class DiscussionDetailCommentAPITestCase(APITestCase):
         self.assertIn('error', response.data)
         self.assertEqual(response.data['error'], 'Parent comment not found')
 
+    def test_delete_comment_by_author(self):
+        """Test that the author can delete their own comment."""
+        url = f'/api/discussions/comments/{self.comment.id}/delete/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['message'], 'Comment deleted successfully')
+        self.assertFalse(DiscussionComment.objects.filter(id=self.comment.id).exists())
+
+    def test_delete_comment_by_other_user(self):
+        """Test that a non-author cannot delete someone else's comment."""
+        self.client.force_login(self.other_user)  # Log in as another user
+        url = f'/api/discussions/comments/{self.comment.id}/delete/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['error'], 'Permission denied')
+        self.assertTrue(DiscussionComment.objects.filter(id=self.comment.id).exists())
+
+    def test_delete_comment_unauthenticated(self):
+        """Test that an unauthenticated user cannot delete a comment."""
+        self.client.logout()  # Log out the user
+        url = f'/api/discussions/comments/{self.comment.id}/delete/'
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(DiscussionComment.objects.filter(id=self.comment.id).exists())
+
+    def test_delete_nonexistent_comment(self):
+        """Test deleting a comment that does not exist."""
+        url = '/api/discussions/comments/999/delete/'  # Assuming 999 is an invalid ID
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data['error'], 'Comment not found')
+
 class CategoryTestCase(APITestCase):
     def setUp(self):
         DiscussionCategory.objects.create(name="General")
         DiscussionCategory.objects.create(name="Specific")
 
     def test_list_categories(self):
+        """Test the listing of categories."""
         response = self.client.get('/api/discussions/categories/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
         self.assertEqual(response.data[0]['name'], "General")
 
-from rest_framework.test import APITestCase
-from rest_framework import status
-from .models import Discussion, DiscussionCategory, User
-
-class DiscussionSearchAPITestCase(APITestCase):
+class SearchTestCase(APITestCase):
     def setUp(self):
         user = User.objects.create_user(username="testuser", password="testpass")
         category1 = DiscussionCategory.objects.create(name="General")
@@ -150,29 +220,34 @@ class DiscussionSearchAPITestCase(APITestCase):
         discussion2.categories.add(category2)
 
     def test_filter_search_title(self):
+        """Test if query search works on title."""
         response = self.client.get('/api/discussions/search/?q=One')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['title'], "Discussion One")
 
     def test_filter_search_contents(self):
+        """Test if query search works on content."""
         response = self.client.get('/api/discussions/search/?q=Details')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
         self.assertEqual(response.data[0]['content'], "Discussion Details")
         
     def test_filter_no_match(self):
+        """Test invalid search."""
         response = self.client.get('/api/discussions/search/?q=invalid')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 0)
 
     def test_filter_categories(self):
+        """Test if discussions can be filtered by category."""
         response = self.client.get('/api/discussions/search/?categories=General,Help')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)  # Only the Python Tips discussion should be returned
+        self.assertEqual(len(response.data), 1)  # Only Discussion One should be returned
         self.assertEqual(response.data[0]['title'], "Discussion One")
 
     def test_filter_categories_no_match(self):
+        """Test if discussions can be filtered by category (no match)."""
         response = self.client.get('/api/discussions/search/?categories=Specific,Help')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 0)

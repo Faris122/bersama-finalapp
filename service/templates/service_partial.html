@@ -1,0 +1,97 @@
+<!-- Bootstrap Nav Tabs -->
+<ul class="nav nav-tabs" id="profileTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="service-comments-tab" data-bs-toggle="tab" data-bs-target="#service-comments" type="button" role="tab" aria-controls="service-comments" aria-selected="true">
+            Service Comments
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="event-comments-tab" data-bs-toggle="tab" data-bs-target="#event-comments" type="button" role="tab" aria-controls="event-comments" aria-selected="false">
+            Event Comments
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content mt-3" id="profileTabsContent">
+    <!-- Service Comments Tab -->
+    <div class="tab-pane fade show active" id="service-comments" role="tabpanel" aria-labelledby="service-comments-tab">
+        <div id="service-comment-list" class="row">
+            <!-- Service Comments will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <!-- Event Comments Tab -->
+    <div class="tab-pane fade" id="event-comments" role="tabpanel" aria-labelledby="event-comments-tab">
+        <div id="event-comment-list" class="row">
+            <!-- Event Comments will be dynamically inserted here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const user = "{{username|safe}}";
+        const serviceCommentList = document.getElementById('service-comment-list');
+        const eventCommentList = document.getElementById('event-comment-list');
+
+        function fetchServiceComments() {
+            fetch(`/api/services/commented_by/${user}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        serviceCommentList.innerHTML = `<div class="alert alert-warning">No comments found.</div>`;
+                        return;
+                    }
+                    serviceCommentList.innerHTML = data.map(comment => `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="/discussions/${comment.post.id}/" class="text-decoration-none text-dark">
+                                            ${comment.post.title}
+                                        </a>
+                                    </h5>
+                                    <p class="card-text">${comment.content}</p>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => console.error('Error fetching comments:', error));
+        }
+        function fetchEventComments() {
+            fetch(`/api/events/commented_by/${user}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        eventCommentList.innerHTML = `<div class="alert alert-warning">No comments found.</div>`;
+                        return;
+                    }
+                    eventCommentList.innerHTML = data.map(comment => `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="/discussions/${comment.post.id}/" class="text-decoration-none text-dark">
+                                            ${comment.post.title}
+                                        </a>
+                                    </h5>
+                                    <p class="card-text">${comment.content}</p>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => console.error('Error fetching comments:', error));
+        }
+        fetchServiceComments();
+        fetchEventComments();
+    });
+</script>

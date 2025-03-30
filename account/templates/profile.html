@@ -1,131 +1,210 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header text-center">
-        <h2 id="profile-header">Profile</h2>
+<h1 class="text-primary" id="profile-header">Profile</h1>
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" id="mainProfileTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="profile-tab" data-bs-toggle="tab" href="#profileContent" role="tab" aria-controls="profileContent" aria-selected="true">Profile</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="financial-tab" data-bs-toggle="tab" href="#financialContent" role="tab" aria-controls="financialContent" aria-selected="false">Financial Profile</a>
+            </li>
+        </ul>
     </div>
     <div class="card-body">
-        <div class="row">
-            <!-- Profile Picture Column -->
-            <div class="col-md-4 text-center">
-                <img id="profile-picture" class="rounded-circle img-fluid" alt="Profile Picture" style="display: none;">
-            </div>
-            <!-- Profile Information Column -->
-            <div class="col-md-8">
-                <p><strong>Username:</strong> <span id="profile-username"></span></p>
-                <p><strong>Role:</strong> <span id="profile-role"></span></p>
-                <p><strong>Bio:</strong> <span id="profile-bio"></span></p>
-                <p id="profile-phone-number" style="display: none;"><strong>Phone Number:</strong> <span></span></p>
-                <p id="profile-website" style="display: none;"><strong>Organisation Website:</strong> <span></span></p>
-                <p><strong>Direct Messages Open:</strong> <span id="profile-dm-open"></span></p>
-                <p><strong>Do I require assistance?</strong> <span id="profile-needs-help"></span></p>
-            </div>
-        </div>
-        <!-- Financial Profile Section -->
-        <div id="financial-profile" class="mt-4" style="display: none;">
-            <h3>Financial Profile</h3>
-            <div class="row">
-                <div class="col-md-6">
-                    <p><strong>Own Income:</strong> <span id="profile-own-income"></span></p>
-                    <p><strong>Employment Status:</strong> <span id="profile-employment-status"></span></p>
-                    <p><strong>Housing Status:</strong> <span id="profile-housing-status"></span></p>
+        <div class="tab-content" id="mainProfileTabsContent">
+            <!-- Profile Tab Content -->
+            <div class="tab-pane fade show active" id="profileContent" role="tabpanel" aria-labelledby="profile-tab">
+                <div class="row">
+                    <!-- Profile Picture Column -->
+                    <div class="col-md-4 text-center">
+                        <img id="profile-picture" class="rounded-circle img-fluid" alt="Profile Picture" style="display: none; height: 120px; width: 120px; object-fit: cover;">
+                    </div>
+                    <!-- Profile Information Column -->
+                    <div class="col-md-4">
+                        <p class="mb-1"><strong>Username:</strong> <span id="profile-username"></span></p>
+                        <p class="mb-1"><strong>Role:</strong> <span id="profile-role"></span></p>
+                        <p class="mb-1"><strong>Bio:</strong> <span id="profile-bio"></span></p>
+                        <p id="profile-phone-number" style="display: none;" class="mb-1"><strong>Phone Number:</strong> <span></span></p>
+                    </div>
+                    <div class="col-md-4">
+                        <p id="profile-website" style="display: none;" class="mb-1"><strong>Organisation Website:</strong> <span></span></p>
+                        <p id="profile-address" style="display: none;" class="mb-1"><strong>Address:</strong> <span></span></p>
+                        <p class="mb-1"><strong>Direct Messages Open:</strong> <span id="profile-dm-open"></span></p>
+                        <p class="mb-1"><strong>Do I require assistance?</strong> <span id="profile-needs-help"></span></p>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <p><strong>Household Income:</strong> <span id="profile-household-income"></span></p>
-                    <p><strong>Household Members:</strong> <span id="profile-household-members"></span></p>
-                    <p><strong>Per Capita Income:</strong> <span id="profile-per-capita-income"></span></p>
-                    <p><strong>Lives with Elderly?:</strong> <span id="profile-has-elderly"></span></p>
-                    <p><strong>Lives with Children?:</strong> <span id="profile-has-children"></span></p>
+            </div>
+            <!-- Financial Profile Tab Content -->
+            <div class="tab-pane fade" id="financialContent" role="tabpanel" aria-labelledby="financial-tab">
+                <h4 class="mb-3">Financial Profile</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Own Income:</strong> <span id="profile-own-income"></span></p>
+                        <p class="mb-1"><strong>Employment Status:</strong> <span id="profile-employment-status"></span></p>
+                        <p class="mb-1"><strong>Housing Status:</strong> <span id="profile-housing-status"></span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Household Income:</strong> <span id="profile-household-income"></span></p>
+                        <p class="mb-1"><strong>Household Members:</strong> <span id="profile-household-members"></span></p>
+                        <p class="mb-1"><strong>Per Capita Income:</strong> <span id="profile-per-capita-income"></span></p>
+                        <p class="mb-1"><strong>Lives with Elderly?:</strong> <span id="profile-has-elderly"></span></p>
+                        <p class="mb-1"><strong>Lives with Children?:</strong> <span id="profile-has-children"></span></p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- Edit Profile Button (conditional) -->
-    <div class="card-footer text-center">
+    <!-- Show different buttons. If user is self, show edit profile, if not, and other User DMs are open, show chat button -->
+    <div class="card-footer mt-3 text-center">
         {% if is_own %}
-        <a href="{% url 'edit_profile' %}" class="btn btn-primary">Edit Profile</a>
+            <a href="{% url 'edit_profile' %}" class="btn btn-primary">Edit Profile</a>
+        {% else %}
+            <button id="chat-button" class="btn btn-success">Chat</button>
         {% endif %}
     </div>
 </div>
 
+<!-- Tabs for content made by user, makes use of partials due to lack of space -->
+<div class="card shadow-sm">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" id="subProfileTabs" role="tablist">
+            <li class="nav-item">
+            <a class="nav-link active" id="discussions-tab" data-bs-toggle="tab" href="#discussions" role="tab" aria-controls="discussions" aria-selected="true">Discussions</a>
+            </li>
+            <li class="nav-item">
+            <a class="nav-link" id="resources-tab" data-bs-toggle="tab" href="#resources" role="tab" aria-controls="resources" aria-selected="false">Resources/Bursaries</a>
+            </li>
+            <li class="nav-item">
+            <a class="nav-link" id="services-tab" data-bs-toggle="tab" href="#services" role="tab" aria-controls="services" aria-selected="false">Services/Events</a>
+            </li>
+            <li class="nav-item">
+            <a class="nav-link" id="fundraisers-tab" data-bs-toggle="tab" href="#fundraisers" role="tab" aria-controls="fundraisers" aria-selected="false">Fundraisers</a>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        <div class="tab-content" id="subProfileTabsContent">
+            <!-- Discussions Tab -->
+            <div class="tab-pane fade show active" id="discussions" role="tabpanel" aria-labelledby="discussions-tab">
+                {% include 'discussion_partial.html' with username=username %}
+            </div>
+                <!-- Resources Tab -->
+            <div class="tab-pane fade" id="resources" role="tabpanel" aria-labelledby="resources-tab">
+                {% include 'resource_partial.html' with username=username %}
+            </div>
+                <!-- Services Tab -->
+            <div class="tab-pane fade" id="services" role="tabpanel" aria-labelledby="services-tab">
+                {% include 'service_partial.html' with username=username %}
+            </div>
+                <!-- Fundraisers Tab -->
+            <div class="tab-pane fade" id="fundraisers" role="tabpanel" aria-labelledby="fundraisers-tab">
+                {% include 'fundraiser_partial.html' with username=username %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    document.addEventListener("DOMContentLoaded", async () => {
-        const profileContainer = document.getElementById("profile-container");
-        const profileHeader = document.getElementById("profile-header");
-        const profileUsername = document.getElementById("profile-username");
-        const profileRole = document.getElementById("profile-role");
-        const profileBio = document.getElementById("profile-bio");
-        const profilePhoneNumber = document.getElementById("profile-phone-number");
-        const profileWebsite = document.getElementById("profile-website");
-        const profileDmOpen = document.getElementById("profile-dm-open");
-        const profileNeedsHelp = document.getElementById("profile-needs-help");
-        const profilePCI = document.getElementById("profile-per-capita-income");
-        const profileElderly = document.getElementById("profile-has-elderly");
-        const profileChildren = document.getElementById("profile-has-children");
-        const profilePicture = document.getElementById("profile-picture");
-        const editProfileBtn = document.getElementById("edit-profile-btn");
+document.addEventListener("DOMContentLoaded", async () => {
+    // Profile elements
+    const profileHeader = document.getElementById("profile-header");
+    const profileUsername = document.getElementById("profile-username");
+    const profileRole = document.getElementById("profile-role");
+    const profileBio = document.getElementById("profile-bio");
+    const profilePhoneNumber = document.getElementById("profile-phone-number");
+    const profileWebsite = document.getElementById("profile-website");
+    const profileAddress = document.getElementById("profile-address");
+    const profileDmOpen = document.getElementById("profile-dm-open");
+    const profileNeedsHelp = document.getElementById("profile-needs-help");
+    const profilePicture = document.getElementById("profile-picture");
+    const chatButton = document.getElementById("chat-button");
 
-        // Fetch the profile data
-        fetch('{{api_url}}', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            }
-        })
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error("Failed to load profile data.");
-            }
-            return response.json();
-        })
-        .then((data) => {
-            console.log(data)
-            profileHeader.textContent = `${data.username}'s Profile`;
-            profileUsername.textContent = data.username;
-            profileRole.textContent = data.role;
-            profileBio.textContent = data.bio || "No bio available.";
-            profileDmOpen.textContent = data.is_dm_open ? "Yes" : "No";
-            profileNeedsHelp.textContent = data.needs_help ? "Yes" : "No";
+    // Fetch the profile data from the API
+    fetch('{{api_url}}', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+        throw new Error("Failed to load profile data.");
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Update Profile Tab
+        profileHeader.textContent = `${data.username}'s Profile`;
+        profileUsername.textContent = data.username;
+        profileRole.textContent = data.role;
+        profileBio.textContent = data.bio || "No bio available.";
+        profileDmOpen.textContent = data.is_dm_open ? "Yes" : "No";
+        profileNeedsHelp.textContent = data.needs_help ? "Yes" : "No";
 
-            if (data.profile_picture) {
-                profilePicture.src = data.profile_picture;
-                profilePicture.style.display = "block";
-            }
+        // Show default profile picture if none
+        if (data.profile_picture) {
+            profilePicture.src = data.profile_picture;
+        } else {
+            profilePicture.src = "/media/profile_pics/default.jpg";
+        }
+        profilePicture.style.display = "block";
 
-            if (data.phone_number) {
-                profilePhoneNumber.querySelector("span").textContent = data.phone_number;
-                profilePhoneNumber.style.display = "block";
-            }
+        // Displaying these depends on context, else hidden
+        if (data.phone_number) {
+            profilePhoneNumber.querySelector("span").textContent = data.phone_number;
+            profilePhoneNumber.style.display = "block";
+        }
 
-            if (data.role === "Organisation" && data.website) {
-                profileWebsite.querySelector("span").textContent = data.website;
-                profileWebsite.style.display = "block";
-            }
-            if (data.needs_help && data.financial_profile) {
-                document.getElementById("profile-own-income").textContent = `$${data.financial_profile.own_income || "N/A"}`;
-                document.getElementById("profile-household-income").textContent = `$${data.financial_profile.household_income || "N/A"}`;
-                document.getElementById("profile-household-members").textContent = data.financial_profile.household_members || "N/A";
-                document.getElementById("profile-employment-status").textContent = data.financial_profile.employment_status || "N/A";
-                document.getElementById("profile-housing-status").textContent = data.financial_profile.housing_status || "N/A";
-                profileElderly.textContent = data.financial_profile.has_elderly ? "Yes" : "No";
-                profileChildren.textContent = data.financial_profile.has_children ? "Yes" : "No";
-                if (data.financial_profile.household_income && data.financial_profile.household_members && data.financial_profile.household_members > 0) {
-                    let perCapitaIncome = data.financial_profile.household_income / data.financial_profile.household_members;
-                    document.getElementById("profile-per-capita-income").textContent = `$${perCapitaIncome.toFixed(2)}`;
-                } else {
-                    document.getElementById("profile-per-capita-income").textContent = "N/A";
-                }
+        if (data.role === "Organisation" && data.website) {
+            profileWebsite.querySelector("span").textContent = data.website;
+            profileWebsite.style.display = "block";
+        }
 
+        if (data.role === "Organisation" && data.website) {
+            profileWebsite.querySelector("span").textContent = data.website;
+            profileWebsite.style.display = "block";
+        }
 
-                document.getElementById("financial-profile").style.display = "block";
+        profileAddress.querySelector("span").textContent = data.address || 'No Address';
+        profileAddress.style.display = "block";
+
+        // Populate Financial Profile Tab (if available)
+        if (data.needs_help && data.financial_profile) {
+            document.getElementById("profile-own-income").textContent = `$${data.financial_profile.own_income || "N/A"}`;
+            document.getElementById("profile-household-income").textContent = `$${data.financial_profile.household_income || "N/A"}`;
+            document.getElementById("profile-household-members").textContent = data.financial_profile.household_members || "N/A";
+            document.getElementById("profile-employment-status").textContent = data.financial_profile.employment_status || "N/A";
+            document.getElementById("profile-housing-status").textContent = data.financial_profile.housing_status || "N/A";
+            document.getElementById("profile-has-elderly").textContent = data.financial_profile.has_elderly ? "Yes" : "No";
+            document.getElementById("profile-has-children").textContent = data.financial_profile.has_children ? "Yes" : "No";
+
+            if (data.financial_profile.household_income && data.financial_profile.household_members && data.financial_profile.household_members > 0) {
+                let perCapitaIncome = data.financial_profile.household_income / data.financial_profile.household_members;
+                document.getElementById("profile-per-capita-income").textContent = `$${perCapitaIncome.toFixed(2)}`;
+            } else {
+                document.getElementById("profile-per-capita-income").textContent = "N/A";
             }
-        })
-        .catch((error) => {
-            profileContainer.textContent = "Error loading profile.";
-            console.error(error);
-        });
+        }
+
+        // Enable chat button if DMs are open
+        if (data.is_dm_open) {
+            chatButton.style.display = "inline-block";
+            chatButton.addEventListener("click", () => {
+                window.location.href = `/chat/${data.username}/`;
+            });
+        } else {
+            chatButton.style.display = "none";
+        }
+    })
+    .catch(error => {
+        console.error(error);
     });
+
+});
+
 </script>
 {% endblock %}

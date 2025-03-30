@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 id="resource-title" class="card-title"></h2>
+    </div>
+    <div class="card-body">
+        <p id="resource-content" class="card-text"></p>
+        <p><strong>Categories:</strong> <span id="resource-categories"></span></p>
+        <p><strong>Link:</strong> <span id="resource-link"></span></p>
+        <p><strong>Attachment:</strong> <span id="resource-attachment"></span></p>
+        <p><strong>Gross Household Income:</strong></p>
+        <ul>
+            <li><strong>Min:</strong> <span id="min-gross-income"></span></li>
+            <li><strong>Max:</strong> <span id="max-gross-income"></span></li>
+        </ul>
+
+        <p><strong>Per Capita Household Income:</strong></p>
+        <ul>
+            <li><strong>Min:</strong> <span id="min-pc-income"></span></li>
+            <li><strong>Max:</strong> <span id="max-pc-income"></span></li>
+        </ul>
+        <p><strong>Deadline:</strong> <span id="bursary-deadline"></span></p>
+        <p><strong>Level:</strong> <span id="bursary-level"></span></p>
+    </div>
+    <div class="card-footer text-muted" id="resource-author"></div>
+</div>
+
+<!-- Comment Form -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3>Post a Comment</h3>
+    </div>
+    <div class="card-body">
+        {% if user.is_authenticated %}
+        <form id="comment-form">
+            <div class="mb-3">
+                <textarea id="comment-content" class="form-control" rows="3" placeholder="Write a comment..."></textarea>
+            </div>
+            <input type="hidden" id="parent-id" value="">
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+        {% else %}
+        <p>Log in/Register to post a comment</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Comments Section -->
+<div class="card">
+    <div class="card-header">
+        <h3>Comments</h3>
+    </div>
+    <div class="card-body" id="comments-container">
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const currentUser = "{{ user.username }}";
+
+        fetch(`/api/resources/{{ resource.id }}/`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("resource-title").textContent = data.title;
+                document.getElementById("resource-content").textContent = data.content;
+                
+
+                if (data.link) {
+                    let link = data.link;
+                    if (!link.startsWith("http://") && !link.startsWith("https://")) {
+                        link = "http://" + link;
+                    }
+                    document.getElementById("resource-link").innerHTML = `<a href="${link}" target="_blank">${link}</a>`;
+                } else {
+                    document.getElementById("resource-link").textContent = "No link available";
+                }
+
+                if (data.attachment) {
+                    document.getElementById("resource-attachment").innerHTML = 
+                        `<a href="${data.attachment}" target="_blank" download>Download Attachment</a>`;
+                } else {
+                    document.getElementById("resource-attachment").textContent = "No attachment available";
+                }
+
+                document.getElementById("min-gross-income").textContent = data.min_income_gross ? `$${data.min_income_gross.toLocaleString()}` : "N/A";
+                document.getElementById("max-gross-income").textContent = data.max_income_gross ? `$${data.max_income_gross.toLocaleString()}` : "N/A";
+                document.getElementById("min-pc-income").textContent = data.min_income_pc ? `$${data.min_income_pc.toLocaleString()}` : "N/A";
+                document.getElementById("max-pc-income").textContent = data.max_income_pc ? `$${data.max_income_pc.toLocaleString()}` : "N/A";
+
+                document.getElementById("resource-author").innerHTML = 
+                    `<p>Created by <a href="/user/${data.author_username}" class="text-decoration-none">@${data.author_username}</a> on ${new Date(data.created_at).toLocaleString()}</p>`;
+
+                // Check if the resource is a bursary
+                if (data.isBursary) {
+                    document.getElementById("bursary-deadline").textContent = data.deadline || "No deadline specified";
+                    document.getElementById("bursary-level").textContent = data.level || "N/A";
+                    document.getElementById("bursary-deadline").parentElement.style.display = "block";
+                    document.getElementById("bursary-level").parentElement.style.display = "block";
+
+                    // Display "Bursaries are not categorised" for bursaries
+                    document.getElementById("resource-categories").textContent = 'Bursaries are not categorised';
+                } else {
+                    // Hide the deadline and level for non-bursary resources
+                    document.getElementById("bursary-deadline").parentElement.style.display = "none";
+                    document.getElementById("bursary-level").parentElement.style.display = "none";
+
+                    // Display categories for non-bursaries
+                    if (data.categories) {
+                        document.getElementById("resource-categories").innerHTML = data.categories.map(cat => {
+                            const colours = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+                            const colour = colours[cat.id % colours.length];
+                            return `<a href="/resources/?categories=${encodeURIComponent(cat.name)}" 
+                                    class="badge bg-${colour} me-1">${cat.name}</a>`;
+                        }).join(' ');
+                    } else {
+                        document.getElementById("resource-categories").textContent = "No categories available";
+                    }
+                }
+
+                if (currentUser === data.author_username) {
+                    const deleteBtn = document.createElement("button");
+                    deleteBtn.classList.add("btn", "btn-danger", "ms-2");
+                    deleteBtn.textContent = "Delete Resource";
+                    document.getElementById("resource-author").appendChild(deleteBtn);
+
+                    deleteBtn.addEventListener("click", () => {
+                        if (confirm("Are you sure you want to delete this resource?")) {
+                            fetch(`/api/resources/{{ resource.id }}/delete/`, {
+                                method: "DELETE",
+                                headers: {
+                                    "X-CSRFToken": "{{ csrf_token }}"
+                                }
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error("Failed to delete resource.");
+                                }
+                                return response.json();
+                            })
+                            .then(() => {
+                                alert("Resource deleted successfully!");
+                                window.location.href = "/resources/";  // Redirect to the resources list page
+                            })
+                            .catch(error => {
+                                console.error("Error deleting resource:", error);
+                                alert("Error deleting resource.");
+                            });
+                        }
+                    });
+                }
+
+                renderComments(data.comments);
+            })
+            .catch(error => console.error("Error fetching resource details:", error));
+
+        document.getElementById("comment-form").addEventListener("submit", event => {
+            event.preventDefault();
+            const content = document.getElementById("comment-content").value.trim();
+            const parentId = document.getElementById("parent-id").value;
+
+            if (!content) {
+                alert("Comment cannot be empty!");
+                return;
+            }
+
+            fetch(`/api/resources/{{ resource.id }}/add_comment/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: JSON.stringify({ content, parent: parentId })
+            })
+            .then(response => response.json())
+            .then(() => location.reload())
+            .catch(error => console.error("Error posting comment:", error));
+        });
+    });
+
+    // Function to toggle an inline reply form
+    function toggleReplyForm(commentId, container) {
+        // Check if a reply form already exists inside the container
+        let replyForm = container.querySelector('.reply-form');
+        if (replyForm) {
+            // If it exists, remove it (toggle off)
+            replyForm.remove();
+        } else {
+            // Otherwise, create a new reply form
+            replyForm = document.createElement('div');
+            replyForm.classList.add('reply-form', 'mt-2');
+            replyForm.innerHTML = `
+                <textarea class="form-control reply-content" rows="2" placeholder="Write a reply..."></textarea>
+                <button class="btn btn-sm btn-primary mt-2 submit-reply" data-parent-id="${commentId}">Submit Reply</button>
+            `;
+            container.appendChild(replyForm);
+
+            // Attach event listener to the "Submit Reply" button
+            replyForm.querySelector('.submit-reply').addEventListener('click', () => {
+                const replyContent = replyForm.querySelector('.reply-content').value.trim();
+                if (!replyContent) {
+                    alert('Reply cannot be empty.');
+                    return;
+                }
+                // Post the reply via API
+                fetch(`/api/discussions/{{ discussion.id }}/add_comment/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ content: replyContent, parent: commentId })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to post reply');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert("Reply posted successfully!");
+                    location.reload();
+                })
+                .catch(error => {
+                    console.error('Error posting reply:', error);
+                    alert('Error posting reply.');
+                });
+            });
+        }
+    }
+
+    // renderComments to display comments dynamically
+    function renderComments(comments, parentElement = null) {
+        const currentUser = "{{ user.username }}";
+        const container = parentElement || document.getElementById("comments-container");
+        container.innerHTML = "";
+
+        comments.forEach(comment => {
+            const commentDiv = document.createElement("div");
+            commentDiv.classList.add("border", "p-3", "mb-3", "rounded");
+            commentDiv.id = `comment-${comment.id}`;
+            // Build HTML for the comment, including a Reply button if user is logged in
+            // If the current user is the comment's author, include a Delete button.
+
+            commentDiv.innerHTML = `
+                <p>
+                    <strong><a href="/profile/${comment.author_username}" class="text-decoration-none">@${comment.author_username}</a></strong>
+                    <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                </p>
+                <p>${comment.content}</p>
+                <div class="d-flex gap-2">
+                    ${currentUser === "" ? "" : `<button class="btn btn-sm btn-outline-primary reply-btn" data-id="${comment.id}">Reply</button>`}
+                    ${currentUser === comment.author_username ? `<button class="btn btn-sm btn-danger delete-btn" data-id="${comment.id}">Delete</button>` : ""}
+                </div>
+                <div id="replies-${comment.id}" class="ms-4"></div>
+            `;
+
+            container.appendChild(commentDiv);
+
+            if (comment.replies && comment.replies.length > 0) {
+                renderComments(comment.replies, commentDiv.querySelector(`#replies-${comment.id}`));
+            }
+
+            // Attach event listener to the reply button for this comment
+            const replyBtn = commentDiv.querySelector('.reply-btn');
+            replyBtn.addEventListener("click", () => {
+                const repliesContainer = commentDiv.querySelector(`#replies-${comment.id}`);
+                toggleReplyForm(comment.id, repliesContainer);
+            });
+
+            const deleteBtn = commentDiv.querySelector(".delete-btn");
+            if (deleteBtn) {
+                deleteBtn.addEventListener("click", () => {
+                    fetch(`/api/resources/comments/${comment.id}/delete/`, { method: "DELETE", headers: { "X-CSRFToken": "{{ csrf_token }}" } })
+                        .then(() => location.reload())
+                        .catch(error => console.error("Error deleting comment:", error));
+                });
+            }
+        });
+    }
+</script>
+{% endblock %}

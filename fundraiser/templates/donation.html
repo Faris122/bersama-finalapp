@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="card">
+    <div class="card-header">
+        <h2>Donate to "{{ fundraiser.title }}"</h2>
+    </div>
+    <div class="card-body">
+        <!-- Form to fill up donation info -->
+        <form id="donation-form">
+            <!-- Anonymous user name -->
+            {% if not user.is_authenticated %}
+            <div class="mb-3">
+                <label for="anon_name" class="form-label">Your Name (Leave blank to remain anonymous)</label>
+                <input type="text" class="form-control" id="anon_name" name="anon_name">
+            </div>
+            {% endif %}
+
+            <div class="mb-3">
+                <label for="amount" class="form-label">Amount ($)</label>
+                <input type="number" class="form-control" id="amount" name="amount" step="0.01" min="1" required>
+            </div>
+            <div class="mb-3">
+                <label for="message" class="form-label">Message (Optional)</label>
+                <textarea class="form-control" id="message" name="message" rows="3"></textarea>
+            </div>
+            <p>There is no payment terminal attached, it is automatically assumed payment goes through when
+                the button is clicked.
+            </p>
+            <button type="submit" class="btn btn-primary">Donate</button>
+        </form>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">Donation Successful</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Your donation has been sent successfully. Redirecting back to the fundraiser page...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const donationForm = document.getElementById("donation-form");
+        const successModal = new bootstrap.Modal(document.getElementById("successModal"));
+
+        donationForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const formData = new FormData(donationForm);
+            const data = {
+                amount: formData.get("amount"),
+                message: formData.get("message"),
+                anon_name: formData.get("anon_name") || "Anonymous Donor",
+                fundraiser: "{{ fundraiser.id }}"
+            };
+
+            try {
+                const response = await fetch("/api/donations/create/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    // Show success modal
+                    successModal.show();
+
+                    // Redirect to fundraiser page after 3 seconds
+                    setTimeout(() => {
+                        window.location.href = "{% url 'fundraiser_detail' fundraiser.id %}";
+                    }, 3000);
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error: ${errorData.detail || "Failed to process donation."}`);
+                }
+            } catch (error) {
+                console.error("Error submitting donation:", error);
+                alert("An error occurred while processing your donation.");
+            }
+        });
+    });
+</script>
+{% endblock %}

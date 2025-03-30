@@ -1,11 +1,249 @@
 {% extends 'base.html' %}
 {% block title %}Home{% endblock %}
 {% block content %}
-<h1>Welcome to Bersama</h1>
-<p>This is a prototype of the upcoming web application.</p>
-<h1>Why join us</h1>
-<p>Lorem Ipsum Dolor Sit Amet</p>
+
+<!-- Banner Section -->
+<div class="jumbotron jumbotron-fluid" style="background-color: #000; color: #fff; padding: 2rem 1rem;">
+    <div class="container">
+        <h1 class="display-4">Welcome to Bersama</h1>
+        <p class="lead">We help low-income people connect with each other and organisations, and provide a space for all to discuss and contribute resources, aid, services and events.</p>
+    </div>
+</div>
+
+<!-- Fundraisers/Resources Section -->
+<div class="container my-4">
+    {% if user.is_authenticated and user.profile.needs_help %}
+    <!-- Resources Section for logged-in users with financial profile -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-primary">Recommended Resources</h1>
+        <h4 class="text-secondary">Personalised based on your financial profile</h4>
+    </div>
+    <div id="resource-list" class="row">
+        <!-- Resources will be dynamically inserted here -->
+    </div>
+    {% else %}
+    <!-- Fundraisers Section for others -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-primary">Active Fundraisers</h1>
+        <h4 class="text-secondary">Do support someone in need. No sign-ups required</h4>
+    </div>
+    <div id="fundraiser-list" class="row">
+        <!-- Fundraisers will be dynamically inserted here -->
+    </div>
+    {% endif %}
+</div>
+
+<!-- Events Section -->
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-primary">Upcoming/Currently Running Events</h1>
+        <h4 class="text-secondary">Join us, as a volunteer or beneficiary</h4>
+    </div>
+
+    <div id="event-list" class="row">
+        <!-- Events will be dynamically inserted here -->
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const fundraiserList = document.getElementById('fundraiser-list');
+        const eventList = document.getElementById('event-list');
+
+        const currentUser = "{{ user.username }}";
+        const needsHelp = {% if user.is_authenticated and user.profile.needs_help %}true{% else %}false{% endif %};
+        
+        if (needsHelp) {
+            fetchResources();
+        } else {
+            fetchFundraisers();
+        }
+        fetchEvents();
+
+        function fetchResources() {
+            const resourceList = document.getElementById('resource-list');
+            fetch('/api/resources/recommended/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        resourceList.innerHTML = `
+                            <div class="alert alert-warning">
+                                No recommended resources found. 
+                                <a href="/resources/create/" class="alert-link">Browse all resources</a>
+                            </div>`;
+                        return;
+                    }
+                    resourceList.innerHTML = data.map(resource => `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="/resources/${resource.id}/" class="text-decoration-none text-dark">
+                                            ${resource.title}
+                                        </a>
+                                    </h5>
+                                    <p class="card-text">
+                                        <strong>Categories:</strong> 
+                                        ${resource.categories.map(cat => {
+                                            const colours = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+                                            const colour = colours[cat.id % colours.length];
+                                            return `<a href="/resources/?categories=${cat.name}/" class="badge bg-${colour} me-1" 
+                                                    data-category-name="${cat.name}">${cat.name}</a>`;
+                                        }).join('')}
+                                    </p>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">Posted: ${new Date(resource.created_at).toLocaleString()} by <a href="/profile/${resource.author_username}/" class="text-decoration-none">@${resource.author_username}</a></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => {
+                    console.error('Error fetching resources:', error);
+                    resourceList.innerHTML = `
+                        <div class="alert alert-danger">
+                            Error loading recommended resources. 
+                            <a href="/resources/" class="alert-link">Browse all resources</a>
+                        </div>`;
+                });
+        }
+
+        function fetchFundraisers(query = '') {
+            let url = `/api/fundraisers/active/`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        fundraiserList.innerHTML = `<div class="alert alert-warning">No fundraisers found.</div>`;
+                        return;
+                    }
+                    fundraiserList.innerHTML = data.map(fundraiser => {
+                        const currentDate = new Date();
+                        const endDate = new Date(fundraiser.end_date);
+                        const isOverdue = currentDate > endDate;
+                        const progressPercentage = Math.min((fundraiser.amount_raised / fundraiser.goal_amount) * 100, 100);
+                        
+                        return `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title mb-0">
+                                            <a href="/fundraisers/${fundraiser.id}/" class="text-decoration-none text-dark">
+                                                ${fundraiser.title}
+                                            </a>
+                                        </h5>
+                                        <span class="badge ${isOverdue ? 'bg-danger' : 'bg-success'}">
+                                            ${isOverdue ? 'Overdue' : 'In Progress'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small class="text-muted">
+                                            By <a href="/profile/${fundraiser.username}/" class="text-decoration-none">
+                                                @${fundraiser.username}
+                                            </a>
+                                        </small>
+                                        <small class="text-muted">
+                                            Due: ${endDate.toLocaleDateString()}
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="progress mb-2" style="height: 20px;">
+                                        <div class="progress-bar bg-primary" 
+                                            role="progressbar" 
+                                            style="width: ${progressPercentage}%" 
+                                            aria-valuenow="${progressPercentage}" 
+                                            aria-valuemin="0" 
+                                            aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">
+                                            Raised: $${fundraiser.amount_raised}
+                                        </small>
+                                        <small class="text-muted">
+                                            Goal: $${fundraiser.goal_amount}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                })
+                .catch(error => console.error('Error fetching fundraisers:', error));
+        }
+
+        function fetchEvents() {
+            let url = `/api/events/running/`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        eventList.innerHTML = `<div class="alert alert-warning">No current/upcoming events found.</div>`;
+                        return;
+                    }
+                    eventList.innerHTML = data.map(event => {
+                        const now = new Date();
+                        const startDate = new Date(event.datetime_start);
+                        const endDate = new Date(event.datetime_end);
+                        
+                        let status, badgeClass;
+                        if (now < startDate) {
+                            status = 'Upcoming';
+                            badgeClass = 'bg-info';
+                        } else if (now >= startDate && now <= endDate) {
+                            status = 'In Progress';
+                            badgeClass = 'bg-success';
+                        } else {
+                            status = 'Completed';
+                            badgeClass = 'bg-secondary';
+                        }
+                        
+                        return `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h5 class="card-title mb-0">
+                                            <a href="/events/${event.id}/" class="text-decoration-none text-dark">
+                                                ${event.title}
+                                            </a>
+                                        </h5>
+                                        <span class="badge ${badgeClass}">${status}</span>
+                                    </div>
+                                    
+                                    <p class="card-text mt-2">
+                                        <strong>Duration:</strong> ${startDate.toLocaleString()} - ${endDate.toLocaleString()}
+                                    </p>
+                                    
+                                    <p class="card-text">
+                                        <strong>Categories:</strong> 
+                                        ${event.categories.map(cat => {
+                                            const colours = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+                                            const colour = colours[cat.id % colours.length];
+                                            return `<a href="/events/?categories=${cat.name}/" class="badge bg-${colour} me-1" 
+                                                    data-category-name="${cat.name}">${cat.name}</a>`;
+                                        }).join('')}
+                                    </p>
+                                    
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">Posted: ${new Date(event.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                })
+                .catch(error => console.error('Error fetching events:', error));
+        }
+        fetchFundraisers();
+        fetchEvents();
+    });
+</script>
+
 {% endblock %}
-
-
-.

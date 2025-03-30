@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="text-primary">Grants and Bursaries</h1>
+    <div>
+        {% if user.is_authenticated %}
+            <a href="{% url 'create_resource' %}" class="btn btn-success">Contribute Resource/Bursary</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Search Bar & Category Filter -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" id="bursary-search-query" class="form-control" placeholder="Search bursaries...">
+    </div>
+    <div class="col-md-4">
+        <select id="bursary-level-filter" class="form-select">
+            <option value="">Select Level</option>
+            <!-- Levels will be dynamically loaded here -->
+        </select>
+    </div>
+    <div class="col-md-2 d-flex">
+        <button id="reset-bursary-filters" class="btn btn-secondary w-100">Reset</button>
+    </div>
+</div>
+
+<div id="bursary-list" class="row">
+    <!-- Resources will be dynamically inserted here -->
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Pass initial levels from Django to JavaScript
+        const initialLevels = {{ initial_levels|safe }};
+        let selectedLevels = initialLevels;  // Initialize with URL parameters
+        const bursaryList = document.getElementById('bursary-list');
+        const bursarySearchInput = document.getElementById('bursary-search-query');
+        const bursaryLevelFilter = document.getElementById('bursary-level-filter');
+        const resetBursaryButton = document.getElementById('reset-bursary-filters');
+
+        // Fetch and display bursaries
+        function fetchBursaries(query = '', levels = []) {
+            let url = `/api/bursaries/search/?q=${query}`;
+            if (levels.length) {
+                url += `&levels=${levels.join(',')}`;
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        bursaryList.innerHTML = `<div class="alert alert-warning">No bursaries found.</div>`;
+                        return;
+                    }
+                    
+                    const currentDate = new Date();
+                    
+                    bursaryList.innerHTML = data.map(bursary => {
+                        // Check if deadline exists and is valid
+                        const hasDeadline = bursary.deadline && new Date(bursary.deadline).getTime() > 0;
+                        const deadline = hasDeadline ? new Date(bursary.deadline) : null;
+                        const isOverdue = hasDeadline && currentDate > deadline;
+                        
+                        return `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h5 class="card-title mb-2">
+                                            <a href="/resources/${bursary.id}/" class="text-decoration-none text-dark">
+                                                ${bursary.title}
+                                            </a>
+                                        </h5>
+                                        ${isOverdue ? 
+                                            '<span class="badge bg-danger ms-2">Overdue</span>' : 
+                                            ''}
+                                    </div>
+                                    <p class="card-text">
+                                        <strong>Level:</strong> 
+                                        ${bursary.level.split(',').map(level => {
+                                            const colours = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+                                            const colour = colours[level.length % colours.length];
+                                            const isActive = selectedLevels.includes(level) ? 'active' : '';
+                                            return `<a href="#" class="badge bg-${colour} me-1 ${isActive}" 
+                                                    data-level-name="${level}">${level}</a>`;
+                                        }).join('')}
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-end">
+                                        <small class="text-muted">Posted: ${new Date(bursary.created_at).toLocaleString()} by <a href="/profile/${bursary.author_username}/" class="text-decoration-none">@${bursary.author_username}</a></small>
+                                        <div class="text-end">
+                                            ${hasDeadline ? 
+                                                (isOverdue ? 
+                                                    `<small class="text-danger">Deadline passed: ${deadline.toLocaleString()}</small>` : 
+                                                    `<small class="text-muted">Deadline: ${deadline.toLocaleString()}</small>`) : 
+                                                ''}
+                                            <br>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                })
+                .catch(error => console.error('Error fetching bursaries:', error));
+        }
+
+        // Add click handler for level badges
+        document.getElementById('bursary-list').addEventListener('click', function(e) {
+            const badge = e.target.closest('[data-level-name]');
+            if (badge) {
+                e.preventDefault();
+                const levelName = badge.dataset.levelName;
+                const index = selectedLevels.indexOf(levelName);
+                
+                if (index === -1) {
+                    selectedLevels.push(levelName);
+                } else {
+                    selectedLevels.splice(index, 1);
+                }
+                
+                const searchQuery = document.getElementById('bursary-search-query').value;
+                fetchBursaries(searchQuery, selectedLevels);
+            }
+        });
+
+        // Function to fetch and populate levels
+        function fetchBursaryLevels() {
+            fetch('/api/bursaries/levels/')
+                .then(response => response.json())
+                .then(levels => {
+                    const levelFilter = document.getElementById('bursary-level-filter');
+                    levelFilter.innerHTML = `<option value="">Select Level</option>` + levels.map(level => `
+                        <option value="${level}" ${selectedLevels.includes(level) ? 'selected' : ''}>
+                            ${level}
+                        </option>
+                    `).join('');
+                })
+                .catch(error => console.error('Error loading levels:', error));
+        }
+
+        // Event Listeners for Bursaries
+        bursarySearchInput.addEventListener('input', () => {
+            const query = bursarySearchInput.value;
+            fetchBursaries(query, selectedLevels);
+        });
+
+        bursaryLevelFilter.addEventListener('change', () => {
+            const query = bursarySearchInput.value;
+            const selectedLevel = bursaryLevelFilter.value;
+            selectedLevels = selectedLevel ? [selectedLevel] : [];
+            fetchBursaries(query, selectedLevels);
+        });
+
+        resetBursaryButton.addEventListener('click', () => {
+            bursarySearchInput.value = '';
+            bursaryLevelFilter.value = '';
+            selectedLevels = [];
+            fetchBursaries();
+        });
+
+        // Initial Load
+        fetchBursaries(bursarySearchInput.value, selectedLevels);
+        fetchBursaryLevels();
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Chat with <span id="chat-partner">{{ chat_partner_username }}</span></h2>
+    </div>
+    <div class="card-body">
+        <!-- Chat messages space (overflow-y for scroll) -->
+        <div id="chat-messages" style="height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;">
+            <!-- Messages will appear here -->
+        </div>
+    </div>
+    <div class="card-footer">
+        <!-- Chat input form -->
+        <form id="chat-form" class="d-flex">
+            <input type="text" id="chat-input" class="form-control me-2" placeholder="Type your message...">
+            <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const chatId = "{{ chat_id }}";
+        const currentUser = "{{ user.username }}";
+        const chatPartner = document.getElementById("chat-partner").textContent;
+
+        const chatMessages = document.getElementById("chat-messages");
+        const chatForm = document.getElementById("chat-form");
+        const chatInput = document.getElementById("chat-input");
+
+        let unreadIDs = new Set(); // Track unread message IDs
+
+        // Function to append a new message to the chat window
+        function appendMessage(sender, message, timestamp, messageId, isRead) {
+            const messageDiv = document.createElement("div");
+            messageDiv.classList.add("mb-2");
+            messageDiv.id = `message-${messageId}`;  // Add ID for read receipt updates
+
+            if (sender === currentUser) {
+                messageDiv.innerHTML = `<div class="text-end">
+                  <span class="badge bg-primary">${sender}</span>
+                  <p class="mb-0">${message}</p>
+                  <small class="text-muted">${timestamp}</small>
+                  <small id="status-${messageId}" class="${isRead ? 'text-success' : 'text-muted'}">
+                      ${isRead ? 'Read' : 'Sent'}
+                  </small>
+              </div>`;
+            } else {
+                messageDiv.innerHTML = `<div class="text-start">
+                  <span class="badge bg-secondary">${sender}</span>
+                  <p class="mb-0">${message}</p>
+                  <small class="text-muted">${timestamp}</small>
+              </div>`;
+            }
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Fetch past messages when the page loads
+        async function fetchPastMessages() {
+            try {
+                const response = await fetch(`/api/chat/${chatId}/messages/`);
+                if (!response.ok) {
+                    throw new Error("Failed to fetch past messages.");
+                }
+                const data = await response.json();
+                data.messages.forEach(msg => {
+                    appendMessage(msg.sender, msg.message, msg.timestamp, msg.id, msg.read);
+                    if (!msg.read && msg.sender !== currentUser) {
+                        unreadIDs.add(msg.id); // Add unread message IDs
+                    }
+                });
+
+                // Initialise WebSocket after messages are loaded
+                const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+                const chatSocketUrl = `${wsProtocol}://${window.location.host}/ws/chat/${chatId}/`;
+                const chatSocket = new WebSocket(chatSocketUrl);
+
+                // WebSocket event handlers
+                chatSocket.onopen = function () {
+                    console.log("Connected to chat WebSocket at:", chatSocketUrl);
+                    // Send read receipts for unread messages
+                    sendReadReceipts(chatSocket);
+                };
+
+                chatSocket.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'message') {
+                        const timestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
+                        appendMessage(data.sender, data.message, timestamp, data.message_id, false);
+
+                        // If the message is from the partner, mark it as read
+                        if (data.sender !== currentUser) {
+                            // Send a read receipt
+                            chatSocket.send(JSON.stringify({
+                                'type': 'read_receipt',
+                                'message_id': data.message_id,
+                            }));
+                        }
+                    } else if (data.type === 'read_receipt') {
+                        // Update the UI to show the message has been read
+                        const messageDiv = document.getElementById(`message-${data.message_id}`);
+                        if (messageDiv) {
+                            const statusText = document.getElementById(`status-${data.message_id}`);
+                            if (statusText) {
+                                statusText.textContent = 'Read'; // Replace "Sent" with "Read"
+                                // Update class
+                                statusText.classList.remove('text-muted');
+                                statusText.classList.add('text-success'); 
+                            }
+                        }
+                    }
+                };
+
+                chatSocket.onclose = function (event) {
+                    console.log("Chat socket closed unexpectedly");
+                };
+
+                // Handle form submission for sending messages
+                chatForm.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    const message = chatInput.value.trim();
+                    if (!message) return;
+                    chatSocket.send(JSON.stringify({
+                        'type': 'message',
+                        'message': message,
+                        'sender': currentUser
+                    }));
+                    chatInput.value = "";
+                });
+
+            } catch (error) {
+                console.error("Error fetching past messages:", error);
+            }
+        }
+
+        // Send read receipts for all unread messages
+        function sendReadReceipts(chatSocket) {
+            unreadIDs.forEach(id => {
+                chatSocket.send(JSON.stringify({
+                    'type': 'read_receipt',
+                    'message_id': id,
+                }));
+            });
+            // Clear the set after sending receipts
+            unreadIDs.clear();
+        }
+
+        fetchPastMessages();
+    });
+</script>
+{% endblock %}

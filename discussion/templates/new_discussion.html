@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Create a New Discussion</h2>
+<div class="mb-3">
+    <label for="discussion-title" class="form-label">Title (Required)</label>
+    <input type="text" class="form-control" id="discussion-title" placeholder="Enter discussion title">
+</div>
+<div class="mb-3">
+    <label for="discussion-content" class="form-label">Content (Required)</label>
+    <textarea class="form-control" id="discussion-content" rows="5" placeholder="Enter discussion content"></textarea>
+</div>
+<div class="mb-3">
+    <label for="discussion-categories" class="form-label">Categories</label>
+    <div class="dropdown">
+        <button class="btn btn-secondary dropdown-toggle w-100" type="button" id="category-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            Select Categories
+        </button>
+        <ul class="dropdown-menu w-100" id="category-options">
+            <!-- Categories will be dynamically inserted -->
+        </ul>
+    </div>
+</div>
+<button id="submit-discussion" class="btn btn-primary">Submit</button>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const categoryDropdown = document.getElementById("category-dropdown");
+    const categoryOptions = document.getElementById("category-options");
+
+    // Fetch categories to populate the dropdown
+    fetch('/api/discussions/categories/')
+    .then(response => response.json())
+    .then(data => {
+        data.forEach(category => {
+            const listItem = document.createElement('li');
+            listItem.innerHTML = `
+                <label class="dropdown-item">
+                    <input type="checkbox" class="category-checkbox" value="${category.id}"> ${category.name}
+                </label>
+            `;
+            categoryOptions.appendChild(listItem);
+        });
+
+        // Update button text on selection
+        document.querySelectorAll(".category-checkbox").forEach(checkbox => {
+            checkbox.addEventListener("change", updateCategoryText);
+        });
+    })
+    .catch(error => console.error('Error loading categories:', error));
+
+    function updateCategoryText() {
+        // Get selected checkboxes
+        const selectedCheckboxes = Array.from(document.querySelectorAll(".category-checkbox:checked"));
+
+        // Extract category names
+        const selectedCategoryNames = selectedCheckboxes.map(cb => cb.parentNode.textContent.trim());
+
+        // Update button text to show names
+        categoryDropdown.textContent = selectedCategoryNames.length ? selectedCategoryNames.join(", ") : "Select Categories";
+    }
+
+    // Handle discussion creation
+    document.getElementById("submit-discussion").addEventListener("click", () => {
+        const title = document.getElementById("discussion-title").value;
+        const content = document.getElementById("discussion-content").value;
+        // Get category IDs as integers
+        const selectedCategories = Array.from(document.querySelectorAll(".category-checkbox:checked"))
+            .map(cb => parseInt(cb.value));
+
+        if (!title || !content) {
+            alert("Title and content are required!");
+            return;
+        }
+
+        fetch('/api/discussions/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                title: title,
+                content: content,
+                categories: selectedCategories
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errData => { throw new Error(JSON.stringify(errData)); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert("Discussion created successfully!");
+            // Redirect to discussion detail page
+            window.location.href = `/discussions/${data.discussion.id}/`;
+        })
+        .catch(error => {
+            console.error('Error creating discussion:', error);
+            alert("Error creating discussion. Please try again.");
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Customisable Title -->
+    <title>{% block title %}Bersama{% endblock %}</title>
+    <!-- Bootstrap for Django -->
+    {% load bootstrap5 %}
+
+    {% bootstrap_css %}
+    {% bootstrap_javascript %}
+</head>
+<body>
+    <header class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'home' %}">Bersama</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="discussionsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Discussions
+                        </a>
+                        <ul class="dropdown-menu" id="discussion-categories-dropdown" aria-labelledby="discussionsDropdown">
+                            <!-- Categories will be dynamically loaded here -->
+                            <li><a class="dropdown-item" href="{% url 'discussion_list' %}">All Discussions</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="resourcesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Resources
+                        </a>
+                        <ul class="dropdown-menu" id="resource-categories-dropdown" aria-labelledby="discussionsDropdown">
+                            <li><a class="dropdown-item" href="{% url 'resource_list' %}">All Resources</a></li>
+                            <!-- Bursary only list -->
+                            <li><a class="dropdown-item" href="{% url 'bursary_list' %}">Bursaries</a></li>
+                            <!-- Categories will be dynamically loaded here -->
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="servicesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Services
+                        </a>
+                        <ul class="dropdown-menu" id="service-categories-dropdown" aria-labelledby="servicesDropdown">
+                            <!-- Categories will be dynamically loaded here -->
+                            <li><a class="dropdown-item" href="{% url 'service_list' %}">All Services</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="eventsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Events
+                        </a>
+                        <ul class="dropdown-menu" id="event-categories-dropdown" aria-labelledby="eventsDropdown">
+                            <!-- Categories will be dynamically loaded here -->
+                            <li><a class="dropdown-item" href="{% url 'event_list' %}">All Events</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'fundraiser_list' %}">Fundraisers</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    {% if user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <!-- Profile Picture -->
+                            {% if user.profile.profile_pic %}
+                                <img src="{{ user.profile.profile_pic.url }}" alt="Profile Picture" class="rounded-circle" style="width: 30px; height: 30px; object-fit: cover;">
+                            {% else %}
+                                <!-- Default profile picture if none is set -->
+                                <img src="/media/profile_pics/default.jpg" alt="Profile Picture" class="rounded-circle" style="width: 30px; height: 30px; object-fit: cover;">
+                            {% endif %}
+                            <!-- Username -->
+                            <span class="ms-2">@{{ user.username }}</span> <span id="unread_alert" class="badge bg-danger"></span>
+                        </a>
+                        <!-- Dropdown Menu -->
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li>
+                                <a class="dropdown-item" href="{% url 'chat_list' %}">
+                                    💬 Chat <span id="unread_count" class="badge bg-danger"></span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'profile' %}">
+                                    👤 Profile
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{% url 'logout' %}">
+                                    🚪 Logout
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">Login</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'register' %}">Register</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </header>
+    <div class="container">
+    {% block content %}
+    {% endblock %}
+    </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const unreadAlert = document.getElementById("unread_alert");
+            const unreadCount = document.getElementById("unread_count");
+            let user_logged_in = false;
+    
+            // Fetch the total unread count
+            async function fetchTotalUnreadCount() {
+                try {
+                    const response = await fetch('/api/chat/unread_count/');
+                    if (!response.ok) {
+                        throw new Error("Failed to fetch total unread count.");
+                    }
+                    const data = await response.json();
+                    user_logged_in = true;
+                    // Update the unread count in the UI
+                    if (data.total_unread > 0) {
+                        unreadAlert.textContent = '!';
+                        unreadCount.textContent = `${data.total_unread}`;
+                        user_logged_in = true;
+                    } else {
+                        unreadAlert.textContent = '';
+                        unreadCount.textContent = "";
+                        user_logged_in = true;
+                    }
+                } catch (error) {
+                    console.error("Error fetching total unread count:", error);
+                    unreadCountElement.textContent = "";
+                }
+            }
+
+            // Fetch discussion categories and populate the dropdown
+            async function fetchDiscussionCategories() {
+                try {
+                    const response = await fetch('/api/discussions/categories/');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch discussion categories');
+                    }
+                    const categories = await response.json();
+
+                    const dropdown = document.getElementById('discussion-categories-dropdown');
+                    categories.forEach(category => {
+                        const dropdownItem = document.createElement('li');
+                        const badgeColour = getBadgeColour(category.id);
+                        dropdownItem.innerHTML = `
+                            <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'discussion_list' %}?categories=${category.name}">
+                            <span class="badge bg-${badgeColour}">${category.name}</span>
+                        </a>
+                        `;
+                        dropdown.appendChild(dropdownItem);
+                    });
+                } catch (error) {
+                    console.error('Error fetching discussion categories:', error);
+                }
+            }
+
+            async function fetchResourceCategories() {
+                try {
+                    const response = await fetch('/api/resources/categories/');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch resource categories');
+                    }
+                    const categories = await response.json();
+
+                    const dropdown = document.getElementById('resource-categories-dropdown');
+                    categories.forEach(category => {
+                        const dropdownItem = document.createElement('li');
+                        const badgeColour = getBadgeColour(category.id);
+                        dropdownItem.innerHTML = `
+                            <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'resource_list' %}?categories=${category.name}">
+                            <span class="badge bg-${badgeColour}">${category.name}</span>
+                        </a>
+                        `;
+                        dropdown.appendChild(dropdownItem);
+                    });
+                } catch (error) {
+                    console.error('Error fetching resource categories:', error);
+                }
+            }
+
+            async function fetchServiceCategories() {
+                try {
+                    const response = await fetch('/api/services/categories/');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch service categories');
+                    }
+                    const categories = await response.json();
+
+                    const dropdown = document.getElementById('service-categories-dropdown');
+                    categories.forEach(category => {
+                        const dropdownItem = document.createElement('li');
+                        const badgeColour = getBadgeColour(category.id);
+                        dropdownItem.innerHTML = `
+                            <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'service_list' %}?categories=${category.name}">
+                            <span class="badge bg-${badgeColour}">${category.name}</span>
+                        </a>
+                        `;
+                        dropdown.appendChild(dropdownItem);
+                    });
+                } catch (error) {
+                    console.error('Error fetching service categories:', error);
+                }
+            }
+
+            async function fetchEventCategories() {
+                try {
+                    const response = await fetch('/api/events/categories/');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch event categories');
+                    }
+                    const categories = await response.json();
+
+                    const dropdown = document.getElementById('event-categories-dropdown');
+                    categories.forEach(category => {
+                        const dropdownItem = document.createElement('li');
+                        const badgeColour = getBadgeColour(category.id);
+                        dropdownItem.innerHTML = `
+                            <a class="dropdown-item d-flex justify-content-between align-items-center" href="{% url 'event_list' %}?categories=${category.name}">
+                            <span class="badge bg-${badgeColour}">${category.name}</span>
+                        </a>
+                        `;
+                        dropdown.appendChild(dropdownItem);
+                    });
+                } catch (error) {
+                    console.error('Error fetching event categories:', error);
+                }
+            }
+
+            // Function to generate a badge colour based on category ID
+            function getBadgeColour(categoryId) {
+                const colours = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+                return colours[categoryId % colours.length];  // Use modulo to cycle through colours
+            }
+            function unreadCounter(){
+                if(user_logged_in){
+                    fetchTotalUnreadCount();
+                }
+            }
+    
+            // Call the function to load the unread count
+            setInterval(unreadCounter, 30000);
+            
+            fetchTotalUnreadCount();
+            fetchDiscussionCategories();
+            fetchResourceCategories();
+            fetchServiceCategories();
+            fetchEventCategories();
+        });
+    </script>
+</body>
+</html>

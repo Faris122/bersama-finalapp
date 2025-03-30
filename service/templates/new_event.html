@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-center">Contribute a New Event</h1>
+<div class="card p-4">
+    <div class="mb-3">
+        <label for="title" class="form-label">Event Title</label>
+        <input type="text" class="form-control" id="title" placeholder="Enter event title">
+    </div>
+    <div class="mb-3">
+        <label for="content" class="form-label">Description</label>
+        <textarea id="content" class="form-control" placeholder="Enter event description"></textarea>
+    </div>
+    <div class="mb-3">
+        <label for="discussion-categories" class="form-label">Categories</label>
+        <div class="dropdown">
+            <button class="btn btn-secondary dropdown-toggle w-100" type="button" id="category-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                Select Categories
+            </button>
+            <ul class="dropdown-menu w-100" id="category-options">
+                <!-- Categories will be dynamically inserted -->
+            </ul>
+        </div>
+    </div>
+    <div class="mb-3">
+        <p>
+            You should type the full postal address above first. The input below is for locating your address in the map.
+            This gets the X and Y coordinates for the event to appear properly on the map.
+        </p>
+        <label for="addressName" class="form-label">Address Name</label>
+        <input type="text" class="form-control" id="addressName" placeholder="Enter address name">
+    </div>
+    <h3 class="text-center">Get Address Location (for better geolocation)</h3>
+    <div class="mb-3">
+        <label for="addressInput" class="form-label">Search Address</label>
+        <input type="text" class="form-control" id="addressInput" placeholder="Search address">
+    </div>
+    <button class="btn btn-primary w-100" onclick="searchAddress()">Search</button>
+    <ul class="list-group mt-3" id="addressResults"></ul>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <button class="btn btn-secondary w-100 mt-3" onclick="openMap()">Open Map to Select Location</button>
+    <!-- Popup for location map -->
+    
+    <div class="modal fade" id="mapModal" tabindex="-1" aria-labelledby="mapModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mapModalLabel">Select Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="map" style="height: 400px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <p><strong>Latitude:</strong> <span id='lat'></span></p>
+    <p><strong>Longitude:</strong> <span id='long'></span></p>
+    <div class="mb-3">
+        <label for="host" class="form-label">Event Host</label>
+        <input type="text" class="form-control" id="host" placeholder="Enter host name">
+    </div>
+    <div class="mb-3">
+        <label for="phone_contact" class="form-label">Phone Contact</label>
+        <input type="text" class="form-control" id="phone_contact" placeholder="Enter phone number">
+    </div>
+    <div class="mb-3">
+        <label for="email_contact" class="form-label">Email Contact</label>
+        <input type="email" class="form-control" id="email_contact" placeholder="Enter email">
+    </div>
+
+    <div class="mb-3">
+        <label for="datetime_start" class="form-label">Start Date & Time</label>
+        <input type="datetime-local" class="form-control" id="datetime_start" required>
+    </div>
+    <div class="mb-3">
+        <label for="datetime_end" class="form-label">End Date & Time</label>
+        <input type="datetime-local" class="form-control" id="datetime_end" required>
+    </div>
+
+    <button class="btn btn-success w-100 mt-3" onclick="submitEvent()">Create Event</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let map;
+    let marker;
+    let selectedLat;
+    let selectedLon;
+    const categoryDropdown = document.getElementById("category-dropdown");
+    const categoryOptions = document.getElementById("category-options");
+
+    // Fetch categories to populate the dropdown
+    fetch('/api/events/categories/')
+    .then(response => response.json())
+    .then(data => {
+        data.forEach(category => {
+            const listItem = document.createElement('li');
+            listItem.innerHTML = `
+                <label class="dropdown-item">
+                    <input type="checkbox" class="category-checkbox" value="${category.id}"> ${category.name}
+                </label>
+            `;
+            categoryOptions.appendChild(listItem);
+        });
+
+        // Update button text on selection
+        document.querySelectorAll(".category-checkbox").forEach(checkbox => {
+            checkbox.addEventListener("change", updateCategoryText);
+        });
+    })
+    .catch(error => console.error('Error loading categories:', error));
+
+    function updateCategoryText() {
+        // Get selected checkboxes
+        const selectedCheckboxes = Array.from(document.querySelectorAll(".category-checkbox:checked"));
+
+        // Extract category names
+        const selectedCategoryNames = selectedCheckboxes.map(cb => cb.parentNode.textContent.trim());
+
+        // Update button text to show names
+        categoryDropdown.textContent = selectedCategoryNames.length ? selectedCategoryNames.join(", ") : "Select Categories";
+    }
+
+    // Map display function, loaded on click to reduce bandwidth
+    function openMap() {
+        // Default is set to Singapore
+        const initialLat = selectedLat || parseFloat(document.getElementById('lat').textContent) || 1.2902;
+        const initialLon = selectedLon || parseFloat(document.getElementById('long').textContent) || 103.85;
+
+        if (!map) {
+            map = L.map('map', { center: [initialLat, initialLon], zoom: 13 });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
+
+            marker.on('dragend', function (e) {
+                const pos = marker.getLatLng();
+                selectedLat = pos.lat;
+                selectedLon = pos.lng;
+                updateCoordsDisplay();
+                map.setView([selectedLat, selectedLon], map.getZoom()); // 👈 Keep map centered
+            });
+
+            // Ensure proper centring on load
+            map.whenReady(() => {
+                setTimeout(() => {
+                    map.invalidateSize();
+                    map.setView([initialLat, initialLon], 13);
+                }, 300); // Small delay to ensure proper map rendering
+            });
+
+        } else {
+            map.setView([initialLat, initialLon], 13);
+            marker.setLatLng([initialLat, initialLon]);
+        }
+
+        updateCoordsDisplay();
+        new bootstrap.Modal(document.getElementById('mapModal')).show();
+    }
+
+    //Searches address based on search input, displays results
+    async function searchAddress() {
+        const query = document.getElementById('addressInput').value;
+        if (!query) return alert("Please enter an address");
+
+        const response = await fetch(`/api/search-address/?query=${encodeURIComponent(query)}`);
+        const results = await response.json();
+
+        const resultsList = document.getElementById('addressResults');
+        // Set button sets the latitude and longitude
+        resultsList.innerHTML = results.map(item => `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                ${item.display_name}
+                <button class="btn btn-sm btn-success" onclick="saveAddress(${item.lat}, ${item.lon})">
+                    Set
+                </button>
+            </li>
+        `).join('');
+    }
+
+    // Both functions set the latitude and longitude, in the back and front ends respectively
+    function saveAddress(lat, lon) {
+        selectedLat = lat;
+        selectedLon = lon;
+        updateCoordsDisplay();
+    }
+
+    function updateCoordsDisplay() {
+        document.getElementById('lat').textContent = selectedLat?.toFixed(5) || '';
+        document.getElementById('long').textContent = selectedLon?.toFixed(5) || '';
+    }
+
+
+    async function submitEvent() {
+        const startDate = new Date(document.getElementById('datetime_start').value);
+        const endDate = new Date(document.getElementById('datetime_end').value);
+        console.log(`startDate ${startDate}, endDate ${endDate}`);
+        if (startDate > endDate) {
+            alert("End date/time must be on or after start date/time");
+            return;
+        }
+
+        if (isNaN(startDate) || isNaN(endDate)) {
+            alert("Please select valid start and end date/times");
+            return;
+        }
+        if(isNaN(selectedLat) || isNaN(selectedLon)){
+            selectedLat = 0;
+            selectedLon = 0;
+        }
+
+        // Collect form data into a plain object
+        const payload = {
+            title: document.getElementById('title').value,
+            content: document.getElementById('content').value,
+            phone_contact: document.getElementById('phone_contact').value,
+            email_contact: document.getElementById('email_contact').value,
+            address: document.getElementById('addressName').value,
+            latitude: parseFloat(selectedLat.toFixed(5)),
+            longitude: parseFloat(selectedLon.toFixed(5)),
+            datetime_start: startDate.toISOString(),
+            datetime_end: endDate.toISOString(),
+            // Get category IDs as integers
+            categories: Array.from(document.querySelectorAll(".category-checkbox:checked"))
+                .map(cb => parseInt(cb.value))
+        };
+
+        try {
+            console.log(payload)
+            const response = await fetch('/api/events/create/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', // Send as JSON
+                    'X-CSRFToken': '{{ csrf_token }}' // Make sure CSRF token is included
+                },
+                body: JSON.stringify(payload) // Convert the object to a JSON string
+            });
+
+            const data = await response.json();
+            alert(response.status === 201 ? "Event created successfully!" : "Error: " + JSON.stringify(data));
+        } catch (error) {
+            console.error("Error:", error);
+            alert("An error occurred.");
+        }
+    }
+
+</script>
+{% endblock %}

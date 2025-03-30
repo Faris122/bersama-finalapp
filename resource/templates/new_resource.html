@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Contribute a New Resource/Bursary</h2>
+<div class="mb-3">
+    <label for="resource-title" class="form-label">Title (Required)</label>
+    <input type="text" class="form-control" id="resource-title" placeholder="Enter resource title">
+</div>
+<!-- Checkbox to Select Bursary -->
+<div class="form-check mb-3">
+    <input class="form-check-input" type="checkbox" id="is-bursary">
+    <label class="form-check-label" for="is-bursary">This is a bursary</label>
+</div>
+<div class="mb-3">
+    <label for="resource-content" class="form-label">Content (Required)</label>
+    <textarea class="form-control" id="resource-content" rows="5" placeholder="Enter resource content"></textarea>
+</div>
+<div class="mb-3">
+    <label for="resource-categories" class="form-label">Categories (not applicable for bursaries)</label>
+    <div class="dropdown">
+        <button class="btn btn-secondary dropdown-toggle w-100" type="button" id="category-dropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            Select Categories
+        </button>
+        <ul class="dropdown-menu w-100" id="category-options">
+            <!-- Categories will be dynamically inserted -->
+        </ul>
+    </div>
+</div>
+<div class="mb-3">
+    <label for="resource-link" class="form-label">Link</label>
+    <input type="text" class="form-control" id="resource-link" placeholder="Enter resource link">
+</div>
+<div class="mb-3">
+    <label for="resource-attachment" class="form-label">Attachment</label>
+    <input type="file" class="form-control" id="resource-attachment">
+</div>
+
+<div class="mb-3">
+    
+</div>    
+
+<div class="mb-3">
+    <label class="form-label">Household Income</label>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text">Min</span>
+                <input type="number" class="form-control" id="min-household-income" placeholder="Min Household Income">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text">Max</span>
+                <input type="number" class="form-control" id="max-household-income" placeholder="Max Household Income">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Per Capita Income</label>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text">Min</span>
+                <input type="number" class="form-control" id="min-percapita-income" placeholder="Min Per Capita Income">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text">Max</span>
+                <input type="number" class="form-control" id="max-percapita-income" placeholder="Max Per Capita Income">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bursary Level (Hidden by Default) -->
+<div id="bursary-fields" class="mb-3" style="display: none;">
+    <label for="bursary-level" class="form-label">Bursary Level</label>
+    <select class="form-select" id="bursary-level">
+        <option value="">Select Level</option>
+        <option value="primary">Primary</option>
+        <option value="secondary">Secondary</option>
+        <option value="tertiary">Tertiary</option>
+    </select>
+    <label for="bursary-deadline" class="form-label">Deadline</label>
+    <input type="date" class="form-control" id="bursary-deadline">
+</div>
+
+
+<button id="submit-resource" class="btn btn-primary">Submit</button>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const categoriesSelect = document.getElementById("resource-categories");
+        const isBursaryCheckbox = document.getElementById("is-bursary");
+        const bursaryFields = document.getElementById("bursary-fields");
+        const bursaryLevelSelect = document.getElementById("bursary-level");
+        const categoryDropdown = document.getElementById("category-dropdown");
+        const categoryOptions = document.getElementById("category-options");
+
+        // Show/Hide bursary-specific fields
+        isBursaryCheckbox.addEventListener("change", () => {
+            bursaryFields.style.display = isBursaryCheckbox.checked ? "block" : "none";
+        });
+
+        // Fetch categories to populate the dropdown
+        fetch('/api/resources/categories/')
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(category => {
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `
+                    <label class="dropdown-item">
+                        <input type="checkbox" class="category-checkbox" value="${category.id}"> ${category.name}
+                    </label>
+                `;
+                categoryOptions.appendChild(listItem);
+            });
+
+            // Update button text on selection
+            document.querySelectorAll(".category-checkbox").forEach(checkbox => {
+                checkbox.addEventListener("change", updateCategoryText);
+            });
+        })
+        .catch(error => console.error('Error loading categories:', error));
+
+        function updateCategoryText() {
+            // Get selected checkboxes
+            const selectedCheckboxes = Array.from(document.querySelectorAll(".category-checkbox:checked"));
+
+            // Extract category names
+            const selectedCategoryNames = selectedCheckboxes.map(cb => cb.parentNode.textContent.trim());
+
+            // Update button text to show names
+            categoryDropdown.textContent = selectedCategoryNames.length ? selectedCategoryNames.join(", ") : "Select Categories";
+        }
+
+        // Handle resource/bursary creation
+        document.getElementById("submit-resource").addEventListener("click", () => {
+            const title = document.getElementById("resource-title").value;
+            const content = document.getElementById("resource-content").value;
+            const link = document.getElementById("resource-link").value;
+            const min_household = document.getElementById("min-household-income").value;
+            const max_household = document.getElementById("max-household-income").value;
+            const min_percapita = document.getElementById("min-percapita-income").value;
+            const max_percapita = document.getElementById("max-percapita-income").value;
+            // Get category IDs as integers
+            const selectedCategories = Array.from(document.querySelectorAll(".category-checkbox:checked"))
+                .map(cb => parseInt(cb.value));
+            const deadline = document.getElementById("bursary-deadline").value;
+            const isBursary = isBursaryCheckbox.checked;
+            const bursaryLevel = bursaryLevelSelect.value;
+            const attachment = document.getElementById('resource-attachment').files[0];
+
+            if (!title || !content) {
+                alert("Title and content are required!");
+                return;
+            }
+
+            // Determine API URL and payload
+            const apiUrl = isBursary ? '/api/resources/create/bursary/' : '/api/resources/create/';
+            const payload = {
+                title: title,
+                content: content,
+                categories: selectedCategories,
+                link: link,
+                min_income_gross: min_household,
+                max_income_gross: max_household,
+                min_income_pc: min_percapita,
+                max_income_pc: max_percapita,
+                ...(isBursary && { level: bursaryLevel,deadline:deadline }) // Include 'level' only if Bursary is selected
+            };
+            console.log(payload);
+
+            function cleanData(data) {
+                Object.keys(data).forEach(key => {
+                    if (data[key] === "") {
+                        data[key] = null;  // Convert empty strings to null
+                    }
+                });
+                return data;
+            }
+
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify(cleanData(payload))
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(isBursary ? "Bursary created successfully!" : "Resource created successfully!");
+                window.location.href = `/resources/${data.resource.id}/`;  
+            })
+            .catch(error => {
+                console.error('Error creating resource:', error);
+                alert("Error creating resource. Please try again.");
+            });
+        });
+    });
+</script>
+{% endblock %}

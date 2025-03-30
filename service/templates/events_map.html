@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="text-primary">Event Map</h1>
+</div>
+
+<!-- Search Bar & Category Filter -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" id="search-query" class="form-control" placeholder="Search events...">
+    </div>
+    <div class="col-md-4">
+        <select id="category-filter" class="form-select">
+            <option value="">Select Category</option>
+            <!-- Categories will be dynamically loaded here -->
+        </select>
+    </div>
+    <div class="col-md-2 d-flex">
+        <button id="apply-filters" class="btn btn-primary w-100">Apply Filters</button>
+    </div>
+</div>
+
+<a href="{% url 'event_list' %}" class="btn btn-outline-primary">Open List View</a>
+
+<div class="row">
+    <p class="text-center">Only running/upcoming events are shown</p>
+</div>
+
+<!-- Map Container -->
+<div id="map" class="mt-1" style="height: 600px; width: 100%;"></div>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const map = L.map('map').setView([0, 0], 2); // Default view, will be updated based on user location
+
+        // Initialize the OSM layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        const searchInput = document.getElementById('search-query');
+        const categoryFilter = document.getElementById('category-filter');
+        const applyFiltersButton = document.getElementById('apply-filters');
+
+        // Fetch categories and populate the dropdown
+        function fetchCategories() {
+            fetch('/api/events/categories/')
+                .then(response => response.json())
+                .then(categories => {
+                    categoryFilter.innerHTML = `<option value="">Select Category</option>` + categories.map(category => `
+                        <option value="${category.name}">${category.name}</option>
+                    `).join('');
+                })
+                .catch(error => console.error('Error loading categories:', error));
+        }
+
+        // Fetch events and display them on the map
+        function fetchEvents(query = '', category = '') {
+            let url = `/api/events/search/?q=${query}&categories=${category}?running=true`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    // Clear existing markers
+                    map.eachLayer(layer => {
+                        if (layer instanceof L.Marker) {
+                            map.removeLayer(layer);
+                        }
+                    });
+
+                    if (data.length === 0) {
+                        alert("No events found with the given filters.");
+                        return;
+                    }
+
+                    // Add new markers to the map
+                    data.forEach(event => {
+                        if (event.latitude && event.longitude) {
+                            const marker = L.marker([event.latitude, event.longitude]).addTo(map);
+                            marker.bindPopup(` 
+                                <h5>${event.title}</h5>
+                                <p>${event.content}</p>
+                                <p><strong>Categories:</strong> ${event.categories.join(', ')}</p>
+                                <p><strong>Distance:</strong> ${event.distance ? event.distance.toFixed(2) + ' km' : 'N/A'}</p>
+                                <a href="/events/${event.id}/">See Details</a>
+                            `);
+                        }
+                    });
+
+                    // Adjust map view to fit all markers
+                    if (data.length > 0) {
+                        const bounds = data
+                            .filter(event => event.latitude && event.longitude)
+                            .map(event => [event.latitude, event.longitude]);
+                        map.fitBounds(bounds);
+                    }
+                })
+                .catch(error => console.error('Error fetching events:', error));
+        }
+
+        // Apply filters when the button is clicked
+        applyFiltersButton.addEventListener('click', () => {
+            const query = searchInput.value;
+            const category = categoryFilter.value;
+            fetchEvents(query, category);
+        });
+
+        fetchCategories();
+        fetchEvents();
+    });
+</script>
+
+{% endblock %}

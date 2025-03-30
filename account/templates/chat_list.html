@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Your Chats</h2>
+
+<!-- Form for initiating a new chat -->
+<div class="mb-4">
+    <form id="start-chat-form" class="d-flex">
+        <input type="text" id="username-input" class="form-control me-2" placeholder="Enter username (creates new or retrieves existing chat)" required>
+        <button type="submit" class="btn btn-primary">Chat</button>
+    </form>
+    <div id="start-chat-error" class="text-danger mt-2" style="display: none;"></div>
+</div>
+
+<!-- List of Chats -->
+<div id="chat-list">
+    <!-- Chats will be dynamically loaded here -->
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const chatList = document.getElementById("chat-list");
+    const startChatForm = document.getElementById("start-chat-form");
+    const usernameInput = document.getElementById("username-input");
+    const startChatError = document.getElementById("start-chat-error");
+
+    // Fetch the list of chats
+    async function fetchChatList() {
+        try {
+            const response = await fetch('/api/chat/list/');
+            if (!response.ok) {
+                throw new Error("Failed to fetch chat list.");
+            }
+            const data = await response.json();
+            renderChatList(data);
+        } catch (error) {
+            console.error("Error fetching chat list:", error);
+        }
+    }
+
+    // Render the list of chats
+    function renderChatList(chats) {
+        chatList.innerHTML = chats.map(chat => `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        @${chat.user1_username === "{{ request.user.username }}" ? chat.user2_username : chat.user1_username}
+                    </h5>
+                    <p class="card-text">
+                        ${chat.unread_count} unread message(s)
+                    </p>
+                    <a href="/chat/${chat.user1_username === "{{ request.user.username }}" ? chat.user2_username : chat.user1_username}/" class="btn btn-primary">
+                        Open Chat
+                    </a>
+                </div>
+            </div>
+        `).join("");
+    }
+
+    // Handle form submission for starting a new chat
+    startChatForm.addEventListener("submit", async function(event) {
+        event.preventDefault();
+        const username = usernameInput.value.trim();
+
+        if (!username) {
+            startChatError.textContent = "Please enter a username.";
+            startChatError.style.display = "block";
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/chat/create_or_get/?other_username=${username}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to start chat.");
+            }
+
+            const data = await response.json();
+            // Redirect to the new chat
+            window.location.href = `/chat/${username}/`;
+        } catch (error) {
+            startChatError.textContent = error.message;
+            startChatError.style.display = "block";
+        }
+    });
+
+    fetchChatList();
+});
+</script>
+{% endblock %}

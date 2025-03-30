@@ -32,6 +32,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,8 +43,10 @@ INSTALLED_APPS = [
     'home',
     'account',
     'discussion',
+    'fundraiser',
     'resource',
-    'service'
+    'service',
+    'channels'
 ]
 
 MIDDLEWARE = [
@@ -58,10 +61,12 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'finalapp.urls'
 
+
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"], # Global templates
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -137,3 +142,11 @@ LOGOUT_REDIRECT_URL = 'home'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+ASGI_APPLICATION = 'finalapp.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}

@@ -4,6 +4,54 @@
 <h2>Edit Profile</h2>
 <div id="edit-profile-form">
     <div class="mb-3">
+        <!-- Enter Postal Address -->
+        <div class="alert alert-info mb-3">
+            <p class="mb-1"><strong>Important:</strong> This is your complete postal address that will be used for all official purposes.</p>
+            <p class="mb-0">For individual users: Your address remains private.</p>
+        </div>
+        <label for="addressName" class="form-label">Enter your full postal address</label>
+        <input type="text" class="form-control" id="addressName" placeholder="Enter your postal address">
+    </div>
+    <!-- Enter Geolocation Search -->
+    <div class="mb-3">
+        <p class="mb-1">Help us pinpoint your location on the map to locate services near you.</p>
+        <label for="addressInput" class="form-label">Search Location</label>
+        <input type="text" class="form-control" id="addressInput" placeholder="Search Address for geolocation">
+    </div>
+    <button class="btn btn-primary w-100" onclick="searchAddress()">Search</button>
+    <!-- Results dynamically loaded -->
+    <ul class="list-group mt-1" id="addressResults"></ul>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Map display in the form of a modal -->
+    <button class="btn btn-secondary w-100 mt-3" onclick="openMap()">Open Map to Select Location</button>
+    <p class="text-muted">Map is not loaded initially to reduce bandwidth</p>
+
+    <div class="modal fade" id="mapModal" tabindex="-1" aria-labelledby="mapModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mapModalLabel">Select Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="map" style="height: 400px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Latitude and Longitude -->
+    <p class="my-0"><strong>Latitude:</strong> <span id='lat'></span></p>
+    <p><strong>Longitude:</strong> <span id='long'></span></p>
+
+    <!-- Other Inputs -->
+    <div class="mb-3">
         <label for="phone-number" class="form-label">Phone Number</label>
         <input type="text" class="form-control" id="phone-number">
     </div>
@@ -23,7 +71,7 @@
         <input type="file" class="form-control" id="profile-picture">
     </div>
     <div id="website-div" class="mb-3">
-        <label for="website" class="form-label">Website</label>
+        <label for="website" class="form-label">Website (for Organisations)</label>
         <input type="text" class="form-control" id="website">
     </div>
     <div class="mb-3">
@@ -37,7 +85,7 @@
         <input type="checkbox" class="form-check-input" id="needs-help">
         <label for="needs-help" class="form-check-label">Do you require assistance?</label>
     </div>
-    
+
     <!-- Financial Profile Section (Initially Hidden) -->
     <div id="financial-profile-section" style="display: none;">
         <h3>Financial Profile</h3>
@@ -49,17 +97,18 @@
             <label for="own-income" class="form-label">Your Income</label>
             <input type="number" class="form-control" id="own-income" placeholder="Enter your income">
         </div>
-    
+
         <div class="mb-3">
             <label for="household-income" class="form-label">Household Income</label>
             <input type="number" class="form-control" id="household-income" placeholder="Enter household income">
         </div>
-    
+
         <div class="mb-3">
             <label for="household-members" class="form-label">Household Members</label>
-            <input type="number" class="form-control" id="household-members" placeholder="Enter number of household members">
+            <input type="number" class="form-control" id="household-members"
+                placeholder="Enter number of household members">
         </div>
-    
+
         <div class="mb-3">
             <label for="employment-status" class="form-label">Employment Status</label>
             <select id="employment-status" class="form-select">
@@ -70,7 +119,7 @@
                 <option value="Disabled">Disabled</option>
             </select>
         </div>
-    
+
         <div class="mb-3">
             <label for="housing-status" class="form-label">Housing Status</label>
             <select id="housing-status" class="form-select">
@@ -92,12 +141,89 @@
                 <label for="has_children" class="form-check-label">Children</label>
             </div>
         </div>
-    </div>    
+    </div>
     <button id="save-changes" class="btn btn-success">Save Changes</button>
     <a href="{% url 'profile' %}" class="btn btn-secondary">Cancel</a>
 </div>
 
 <script>
+    // Initialise map and marker
+    let map;
+    let marker;
+    let selectedLat;
+    let selectedLon;
+
+    // Map display function, loaded on click to reduce bandwidth
+    function openMap() {
+        // Default is set to Singapore
+        const initialLat = selectedLat || parseFloat(document.getElementById('lat').textContent) || 1.2902;
+        const initialLon = selectedLon || parseFloat(document.getElementById('long').textContent) || 103.85;
+
+        if (!map) {
+            map = L.map('map', { center: [initialLat, initialLon], zoom: 13 });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            marker = L.marker([initialLat, initialLon], { draggable: true }).addTo(map);
+
+            marker.on('dragend', function (e) {
+                const pos = marker.getLatLng();
+                selectedLat = pos.lat;
+                selectedLon = pos.lng;
+                updateCoordsDisplay();
+                map.setView([selectedLat, selectedLon], map.getZoom()); // 👈 Keep map centered
+            });
+
+            // Ensure proper centring on load
+            map.whenReady(() => {
+                setTimeout(() => {
+                    map.invalidateSize();
+                    map.setView([initialLat, initialLon], 13);
+                }, 300); // Small delay to ensure proper map rendering
+            });
+
+        } else {
+            map.setView([initialLat, initialLon], 13);
+            marker.setLatLng([initialLat, initialLon]);
+        }
+
+        updateCoordsDisplay();
+        new bootstrap.Modal(document.getElementById('mapModal')).show();
+    }
+
+    //Searches address based on search input, displays results
+    async function searchAddress() {
+        const query = document.getElementById('addressInput').value;
+        if (!query) return alert("Please enter an address");
+
+        const response = await fetch(`/api/search-address/?query=${encodeURIComponent(query)}`);
+        const results = await response.json();
+
+        const resultsList = document.getElementById('addressResults');
+        // Set button sets the latitude and longitude
+        resultsList.innerHTML = results.map(item => `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                ${item.display_name}
+                <button class="btn btn-sm btn-success" onclick="saveAddress(${item.lat}, ${item.lon})">
+                    Set
+                </button>
+            </li>
+        `).join('');
+    }
+
+    // Both functions set the latitude and longitude, in the back and front ends respectively
+    function saveAddress(lat, lon) {
+        selectedLat = lat;
+        selectedLon = lon;
+        updateCoordsDisplay();
+    }
+
+    function updateCoordsDisplay() {
+        document.getElementById('lat').textContent = selectedLat?.toFixed(5) || '';
+        document.getElementById('long').textContent = selectedLon?.toFixed(5) || '';
+    }
+
+    // Fetches Profile data from API
     function fetchProfile() {
         fetch('/api/profile/', {
             method: 'GET',
@@ -106,49 +232,52 @@
                 'X-CSRFToken': '{{ csrf_token }}'
             }
         })
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('phone-number').value = data.phone_number || '';
-            document.getElementById('is-phone-public').value = data.is_phone_public.toString();
-            document.getElementById('bio').value = data.bio || '';
-            document.getElementById('is-dm-open').value = data.is_dm_open.toString();
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('phone-number').value = data.phone_number || '';
+                document.getElementById('is-phone-public').value = data.is_phone_public.toString();
+                document.getElementById('bio').value = data.bio || '';
+                document.getElementById('is-dm-open').value = data.is_dm_open.toString();
+                document.getElementById('addressName').value = data.address || '';
+                selectedLat = data.latitude
+                selectedLon = data.longitude
 
-            // Handle website visibility
-            const websiteDiv = document.getElementById('website-div');
-            const websiteInput = document.getElementById('website');
-            if (data.role !== 'Organisation') {
-                websiteDiv.style.display = 'none';
-                websiteInput.value = '';
-            } else {
-                websiteDiv.style.display = 'block';
-                websiteInput.value = data.website || '';
-            }
+                // Handle website visibility
+                const websiteDiv = document.getElementById('website-div');
+                const websiteInput = document.getElementById('website');
+                if (data.role !== 'Organisation') {
+                    websiteDiv.style.display = 'none';
+                    websiteInput.value = '';
+                } else {
+                    websiteDiv.style.display = 'block';
+                    websiteInput.value = data.website || '';
+                }
 
-            // Handle needs_help checkbox
-            const needsHelpCheckbox = document.getElementById('needs-help');
-            const financialProfileSection = document.getElementById('financial-profile-section');
-            needsHelpCheckbox.checked = data.needs_help || false;
-            financialProfileSection.style.display = needsHelpCheckbox.checked ? 'block' : 'none';
+                // Handle needs_help checkbox
+                const needsHelpCheckbox = document.getElementById('needs-help');
+                const financialProfileSection = document.getElementById('financial-profile-section');
+                needsHelpCheckbox.checked = data.needs_help || false;
+                financialProfileSection.style.display = needsHelpCheckbox.checked ? 'block' : 'none';
 
-            // Populate financial profile fields if needs_help is true
-            if (needsHelpCheckbox.checked && data.financial_profile) {
-                document.getElementById('own-income').value = data.financial_profile.own_income || '';
-                document.getElementById('household-income').value = data.financial_profile.household_income || '';
-                document.getElementById('household-members').value = data.financial_profile.household_members || '';
-                document.getElementById('employment-status').value = data.financial_profile.employment_status || 'Unemployed';
-                document.getElementById('housing-status').value = data.financial_profile.housing_status || 'Other';
-            }
-        })
-        .catch(error => console.error('Error fetching profile:', error));
+                // Populate financial profile fields if needs_help is true
+                if (needsHelpCheckbox.checked && data.financial_profile) {
+                    document.getElementById('own-income').value = data.financial_profile.own_income || '';
+                    document.getElementById('household-income').value = data.financial_profile.household_income || '';
+                    document.getElementById('household-members').value = data.financial_profile.household_members || '';
+                    document.getElementById('employment-status').value = data.financial_profile.employment_status || 'Unemployed';
+                    document.getElementById('housing-status').value = data.financial_profile.housing_status || 'Other';
+                }
+            })
+            .catch(error => console.error('Error fetching profile:', error));
     }
 
     // Show/hide financial profile section when the checkbox is toggled
-    document.getElementById('needs-help').addEventListener('change', function() {
+    document.getElementById('needs-help').addEventListener('change', function () {
         document.getElementById('financial-profile-section').style.display = this.checked ? 'block' : 'none';
     });
 
     // Handle form submission
-    document.getElementById('save-changes').addEventListener('click', function() {
+    document.getElementById('save-changes').addEventListener('click', function () {
         const formData = new FormData();
         formData.append('phone_number', document.getElementById('phone-number').value);
         formData.append('is_phone_public', document.getElementById('is-phone-public').value);
@@ -156,6 +285,9 @@
         formData.append('website', document.getElementById('website').value);
         formData.append('is_dm_open', document.getElementById('is-dm-open').value);
         formData.append('needs_help', document.getElementById('needs-help').checked);
+        formData.append('address', document.getElementById('addressName').value);
+        formData.append('latitude', selectedLat);
+        formData.append('longitude', selectedLon);
 
         // Include financial profile data if needs_help is checked
         if (document.getElementById('needs-help').checked) {
@@ -168,12 +300,13 @@
             formData.append('has_children', document.getElementById('has_children').checked);
         }
 
-        // Include the profile picture if a file is selected
+        // Include the profile picture if a file is selected (Warning: Due to some errors and time constraints, this is not fixed)
         const profilePicture = document.getElementById('profile-picture').files[0];
         if (profilePicture) {
             formData.append('profile_picture', profilePicture);
         }
 
+        // Update the profile
         fetch('/api/edit_profile/', {
             method: 'PUT',
             headers: {
@@ -181,22 +314,22 @@
             },
             body: formData
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to update profile');
-            }
-            return response.json();
-        })
-        .then(data => {
-            alert('Profile updated successfully!');
-            window.location.href = "{% url 'profile' %}";  // Redirect to profile page
-        })
-        .catch(error => alert('Error updating profile: ' + error.message));
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to update profile');
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert('Profile updated successfully!');
+                window.location.href = "{% url 'profile' %}";  // Redirect to profile page
+            })
+            .catch(error => alert('Error updating profile: ' + error.message));
     });
 
     // Load profile data on page load
     document.addEventListener('DOMContentLoaded', fetchProfile);
 </script>
-    
+
 
 {% endblock %}

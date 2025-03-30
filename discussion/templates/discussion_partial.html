@@ -1,0 +1,106 @@
+<!-- Bootstrap Nav Tabs -->
+<ul class="nav nav-tabs" id="profileTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts" type="button" role="tab" aria-controls="posts" aria-selected="true">
+            Posts
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="discussion-comments-tab" data-bs-toggle="tab" data-bs-target="#discussion-comments" type="button" role="tab" aria-controls="discussion-comments" aria-selected="false">
+            Comments
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content mt-3" id="profileTabsContent">
+    <!-- Posts Tab -->
+    <div class="tab-pane fade show active" id="posts" role="tabpanel" aria-labelledby="posts-tab">
+        <div id="discussion-list" class="row">
+            <!-- Discussions will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <!-- Comments Tab -->
+    <div class="tab-pane fade" id="discussion-comments" role="tabpanel" aria-labelledby="discussion-comments-tab">
+        <div id="discussion-comment-list" class="row">
+            <!-- Comments will be dynamically inserted here -->
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const user = "{{username|safe}}";
+        const discussionList = document.getElementById('discussion-list');
+        const commentList = document.getElementById('discussion-comment-list');
+
+        function fetchDiscussions() {
+            fetch(`/api/discussions/posted_by/${user}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        discussionList.innerHTML = `<div class="alert alert-warning">No discussions found.</div>`;
+                        return;
+                    }
+                    discussionList.innerHTML = data.map(discussion => `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="/discussions/${discussion.id}/" class="text-decoration-none text-dark">
+                                            ${discussion.title}
+                                        </a>
+                                    </h5>
+                                    <p class="card-text">
+                                        <strong>Categories:</strong> 
+                                        ${discussion.categories.map(cat => {
+                                            const colours = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+                                            const colour = colours[cat.id % colours.length];
+                                            return `<span class="badge bg-${colour} me-1">${cat.name}</span>`;
+                                        }).join('')}
+                                    </p>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">${new Date(discussion.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => console.error('Error fetching discussions:', error));
+        }
+
+        function fetchComments() {
+            fetch(`/api/discussions/commented_by/${user}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        commentList.innerHTML = `<div class="alert alert-warning">No comments found.</div>`;
+                        return;
+                    }
+                    commentList.innerHTML = data.map(comment => `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <a href="/discussions/${comment.post.id}/" class="text-decoration-none text-dark">
+                                            ${comment.post.title}
+                                        </a>
+                                    </h5>
+                                    <p class="card-text">${comment.content}</p>
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => console.error('Error fetching comments:', error));
+        }
+
+        fetchDiscussions();
+        fetchComments();
+    });
+</script>

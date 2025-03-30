@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Create a New Fundraiser</h2>
+<div class="mb-3">
+    <label for="fundraiser-title" class="form-label">Title</label>
+    <input type="text" class="form-control" id="fundraiser-title" placeholder="Enter fundraiser title">
+</div>
+<div class="mb-3">
+    <label for="fundraiser-description" class="form-label">Description</label>
+    <textarea class="form-control" id="fundraiser-description" rows="5" placeholder="Enter fundraiser description"></textarea>
+</div>
+<div class="mb-3">
+    <label for="fundraiser-goal-amount" class="form-label">Goal Amount ($)</label>
+    <input type="number" class="form-control" id="fundraiser-goal-amount" step="0.01" min="1" placeholder="Enter goal amount">
+</div>
+<div class="mb-3">
+    <label for="fundraiser-end-date" class="form-label">End Date</label>
+    <input type="datetime-local" class="form-control" id="fundraiser-end-date">
+</div>
+<button id="submit-fundraiser" class="btn btn-primary">Submit</button>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // Handle fundraiser creation
+    document.getElementById("submit-fundraiser").addEventListener("click", () => {
+        const title = document.getElementById("fundraiser-title").value;
+        const description = document.getElementById("fundraiser-description").value;
+        const goalAmount = document.getElementById("fundraiser-goal-amount").value;
+        const endDate = document.getElementById("fundraiser-end-date").value;
+
+        // Validate required fields
+        if (!title || !description || !goalAmount || !endDate) {
+            alert("All fields are required!");
+            return;
+        }
+
+        // Prepare the data for the API request
+        const data = {
+            title: title,
+            description: description,
+            goal_amount: goalAmount,
+            end_date: endDate
+        };
+        
+
+        // Send the API request
+        fetch('/api/fundraisers/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(errData => { throw new Error(JSON.stringify(errData)); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert("Fundraiser created successfully!");
+            // Redirect to the new fundraiser's detail page
+            window.location.href = `/fundraisers/${data.id}/`;
+        })
+        .catch(error => {
+            console.error('Error creating fundraiser:', error);
+            alert("Error creating fundraiser. Please try again.");
+        });
+    });
+});
+</script>
+{% endblock %}

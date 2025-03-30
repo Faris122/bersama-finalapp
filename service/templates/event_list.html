@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="text-primary">Events</h1>
+    <div>
+        {% if user.is_authenticated %}
+            <a href="{% url 'create_event' %}" class="btn btn-success">Contribute an Event</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Location Buttons -->
+<div class="mb-3">
+    <button id="use-profile-location" class="btn btn-outline-secondary me-2">Use Profile Location</button>
+    <button id="use-current-location" class="btn btn-outline-primary">Use Current Location</button>
+</div>
+
+<!-- Search Bar & Category Filter -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" id="search-query" class="form-control" placeholder="Search events...">
+    </div>
+    <div class="col-md-4">
+        <select id="category-filter" class="form-select">
+            <option value="">Select Category</option>
+            <!-- Categories will be dynamically loaded here -->
+        </select>
+    </div>
+    <div class="col-md-2 d-flex">
+        <button id="reset-filters" class="btn btn-secondary w-100">Reset</button>
+    </div>
+</div>
+
+<a href="{% url 'event_map' %}" class="btn btn-outline-primary">Open Map View</a>
+
+<div id="event-list" class="row">
+    <!-- Events will be dynamically inserted here -->
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Pass initial data (in GET) from Django to JavaScript
+        const initialCategories = {{ initial_categories|safe }};
+        let selectedCategories = initialCategories;  // Initialize with URL parameters
+        const eventList = document.getElementById('event-list');
+        const searchInput = document.getElementById('search-query');
+        const categoryFilter = document.getElementById('category-filter');
+        const resetButton = document.getElementById('reset-filters');
+        const useProfileLocationBtn = document.getElementById('use-profile-location');
+        const useCurrentLocationBtn = document.getElementById('use-current-location');
+
+        // Variables to store the selected location coordinates
+        let userLatitude = '';
+        let userLongitude = '';
+        let searchQuery = '';
+
+        // Fetch events from the API using provided latitude and longitude
+        function fetchEvents(latitude = '', longitude = '', query, categories) {
+            let url = `/api/events/search/?q=${query}&categories=${categories}&latitude=${latitude}&longitude=${longitude}`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length === 0) {
+                        eventList.innerHTML = `<div class="alert alert-warning">No events found.</div>`;
+                        return;
+                    }
+                    eventList.innerHTML = data.map(event => {
+                        const now = new Date();
+                        const startDate = new Date(event.datetime_start);
+                        const endDate = new Date(event.datetime_end);
+                        
+                        // Determine event status
+                        let status;
+                        let badgeClass;
+                        if (now < startDate) {
+                            status = 'Upcoming';
+                            badgeClass = 'bg-info';
+                        } else if (now >= startDate && now <= endDate) {
+                            status = 'In Progress';
+                            badgeClass = 'bg-success';
+                        } else {
+                            status = 'Completed';
+                            badgeClass = 'bg-secondary';
+                        }
+                        
+                        return `
+                        <div class="col-md-12 mb-3">
+                            <div class="card shadow-sm border-0">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <h5 class="card-title mb-0">
+                                            <a href="/events/${event.id}/" class="text-decoration-none text-dark">
+                                                ${event.title}
+                                            </a>
+                                        </h5>
+                                        <span class="badge ${badgeClass}">${status}</span>
+                                    </div>
+                                    
+                                    <p class="card-text mt-2">
+                                        <strong>Duration:</strong> ${startDate.toLocaleString()} - ${endDate.toLocaleString()}
+                                    </p>
+                                    
+                                    <p class="card-text">
+                                        <strong>Categories:</strong> 
+                                        ${event.categories.map(cat => {
+                                            const colours = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'dark'];
+                                            const colour = colours[cat.id % colours.length];
+                                            const isActive = selectedCategories.includes(cat.name) ? 'active' : '';
+                                            return `<a href="#" class="badge bg-${colour} me-1 ${isActive}" 
+                                                    data-category-name="${cat.name}">${cat.name}</a>`;
+                                        }).join('')}
+                                    </p>
+                                    
+                                    <p class="card-text">
+                                        <strong>Distance:</strong> ${event.distance ? event.distance.toFixed(2) + ' km' : 'N/A'}
+                                    </p>
+                                    
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">Posted: ${new Date(event.created_at).toLocaleString()}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                })
+                .catch(error => console.error('Error fetching events:', error));
+        }
+
+        // Fetch categories
+        function fetchCategories() {
+            fetch('/api/events/categories/')
+                .then(response => response.json())
+                .then(categories => {
+                    const categoryFilter = document.getElementById('category-filter');
+                    categoryFilter.innerHTML = `<option value="">Select Category</option>` + categories.map(category => `
+                        <option value="${category.name}">${category.name}</option>
+                    `).join('');
+                })
+                .catch(error => console.error('Error loading categories:', error));
+        }
+
+        // Add click handler for category badges
+        document.getElementById('event-list').addEventListener('click', function(e) {
+            const badge = e.target.closest('[data-category-name]');
+            if (badge) {
+                e.preventDefault();
+                const categoryName = badge.dataset.categoryName;
+                const index = selectedCategories.indexOf(categoryName);
+                
+                if (index === -1) {
+                    selectedCategories.push(categoryName);
+                } else {
+                    selectedCategories.splice(index, 1);
+                }
+                
+                const searchQuery = document.getElementById('search-query').value;
+                fetchEvents(userLatitude, userLongitude, searchQuery, selectedCategories);
+            }
+        });
+
+        // Use the profile location (default if user is logged in)
+        useProfileLocationBtn.addEventListener('click', () => {
+            fetch('/api/profile/')  // Your API endpoint that returns user's profile data
+                .then(response => response.json())
+                .then(data => {
+                    if (data.latitude && data.longitude) {
+                        userLatitude = data.latitude;
+                        userLongitude = data.longitude;
+                        fetchEvents(userLatitude, userLongitude, searchQuery, selectedCategories);
+                    } else {
+                        alert("No profile location set. Please update your profile.");
+                    }
+                })
+                .catch(error => console.error('Error fetching profile:', error));
+        });
+
+        // Use GPS to get current location
+        useCurrentLocationBtn.addEventListener('click', () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    userLatitude = position.coords.latitude;
+                    userLongitude = position.coords.longitude;
+                    fetchEvents(userLatitude, userLongitude, searchQuery, selectedCategories);
+                }, (error) => {
+                    console.error("Error getting location: ", error);
+                    alert("Could not retrieve location. Please allow location access.");
+                });
+            } else {
+                alert("Geolocation is not supported in your browser.");
+            }
+        });
+
+        // Event Listeners for search and category filter
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value;
+            const selectedCategories = Array.from(categoryFilter.selectedOptions).map(opt => opt.value);
+            fetchEvents(userLatitude, userLongitude, query, selectedCategories);
+        });
+
+        categoryFilter.addEventListener('change', () => {
+            const query = searchInput.value;
+            const selectedCategory = categoryFilter.value;
+            selectedCategories = selectedCategory ? [selectedCategory] : [];
+            fetchEvents(userLatitude, userLongitude, query, selectedCategories);
+        });
+
+        resetButton.addEventListener('click', () => {
+            searchInput.value = '';
+            categoryFilter.value = '';
+            fetchEvents(userLatitude, userLongitude, searchInput.value, selectedCategories);
+        });
+
+        // Initial load: fetch categories and events using profile location
+        fetchCategories();
+        fetchEvents(userLatitude, userLongitude, searchQuery, selectedCategories);
+    });
+</script>
+
+{% endblock %}
