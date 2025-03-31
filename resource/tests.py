@@ -193,7 +193,7 @@ class ResourceCommentTestCase(APITestCase):
         url = '/api/resources/comments/999/delete/'  # Assuming 999 is an invalid ID
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data['error'], 'Comment not found')
+        self.assertEqual(response.data['detail'], 'No ResourceComment matches the given query.')
 
 class CategoryTestCase(APITestCase):
     def setUp(self):
