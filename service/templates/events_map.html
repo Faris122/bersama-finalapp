@@ -62,7 +62,7 @@
 
         // Fetch events and display them on the map
         function fetchEvents(query = '', category = '') {
-            let url = `/api/events/search/?q=${query}&categories=${category}?running=true`;
+            let url = `/api/events/search/?q=${query}&categories=${category}&running=true`;
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
@@ -81,11 +81,20 @@
                     // Add new markers to the map
                     data.forEach(event => {
                         if (event.latitude && event.longitude) {
+                            // Handle categories whether a single object or array
+                            let categoriesDisplay;
+                            if (Array.isArray(event.categories)) {
+                                categoriesDisplay = event.categories.map(cat => cat.name).join(', ');
+                            } else if (event.categories && event.categories.name) {
+                                categoriesDisplay = event.categories.name;
+                            } else {
+                                categoriesDisplay = 'N/A';
+                            }
                             const marker = L.marker([event.latitude, event.longitude]).addTo(map);
                             marker.bindPopup(` 
                                 <h5>${event.title}</h5>
                                 <p>${event.content}</p>
-                                <p><strong>Categories:</strong> ${event.categories.join(', ')}</p>
+                                <p><strong>Categories:</strong> ${categoriesDisplay}</p>
                                 <p><strong>Distance:</strong> ${event.distance ? event.distance.toFixed(2) + ' km' : 'N/A'}</p>
                                 <a href="/events/${event.id}/">See Details</a>
                             `);

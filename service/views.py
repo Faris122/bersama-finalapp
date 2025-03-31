@@ -335,7 +335,7 @@ def search_events(request):
     if running == "true":
         now = timezone.now()
         # Filter events that are upcoming or in progress
-        events = Event.objects.filter(
+        events = events.filter(
             datetime_end__gte=now  # Events that have not ended
         )
     # Serialize and return results
